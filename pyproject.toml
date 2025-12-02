@@ -1,7 +1,27 @@
 [project]
 name = "imposter"
 version = "0.1.0"
-description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "hatchling",
+    "setuptools",
+    "torch>=2.7.1",
+    "torchvision>=0.22.1",
+    "huggingface-hub[cli]",
+    "jinja2-cli>=0.8.2",
+    "wandb>=0.21.1",
+    "accelerate",
+    "musubi-tuner"
+]
+
+[tool.uv]
+link-mode = "copy"
+no-build-isolation = true
+
+[tool.uv.extra-build-dependencies]
+musubi-tuner = ["hatchling"]
+sageattention = ["torch"]
+
+[tool.uv.sources]
+musubi-tuner = { git = "https://github.com/kohya-ss/musubi-tuner" }
