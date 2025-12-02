@@ -9,6 +9,7 @@
 ```sh
 cd /workspace
 mkdir -p models
+mkdir -p tmp
 git clone https://huggingface.co/datasets/sawara-dev/imposter-data
 git clone https://huggingface.co/datasets/xhiroga/data
 git clone https://github.com/xhiroga/imposter
