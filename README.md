@@ -2,6 +2,13 @@
 
 ## Setup
 
+1. RunPodでVolumeをアタッチしたPodを起動する
+2. Remote SSHで接続
+3. コマンドを実行
+
 ```sh
+git clone https://github.com/xhiroga/imposter
+cd imposter
+uv pip install hatchling
 uv sync
 ```
