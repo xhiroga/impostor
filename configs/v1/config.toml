@@ -33,7 +33,6 @@ learning_rate = 1e-3
 # L40S (VRAM 48GB)のうち32GB程度しか使っていないようなので、gradient_checkpointing = false でも問題ないかもしれない
 # しかし速度がそこまで上がると思えないのでtrueのままで
 gradient_checkpointing = true
-# データのロードが律速になっている印象はないが、RunPodのvCPU数 = 16に合わせてみる
 max_data_loader_n_workers = 1
 persistent_data_loader_workers = true
 # どうせ途中で止めるので...
@@ -49,8 +48,6 @@ save_every_n_steps = 100
 save_state = true
 save_state_on_train_end = true
 
-# 結局5,6位がいい感じに生成できるのでそれに合わせる。
-latent_window_size = 5
 f1 = false
 
 output_dir = "output"
