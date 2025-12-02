@@ -1,0 +1,3 @@
+# Cropped
+rotating 360 degrees. --w 768 --h 768 --f 81 --d 42 --s 20 --i /workspace/data/asagi-chan/chatgpt-4o/asagi-chan-stand-up.png
+rotating 360 degrees. --w 768 --h 768 --f 81 --d 42 --s 20 --i /workspace/data/wilds/chatgpt/pan.png

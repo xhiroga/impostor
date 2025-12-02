@@ -1,0 +1,74 @@
+dit = "/workspace/models/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors"
+vae = "/workspace/models/vae/diffusion_pytorch_model.safetensors"
+text_encoder1 = "/workspace/models/text_encoder/model-00001-of-00004.safetensors"
+text_encoder2 = "/workspace/models/text_encoder_2/model.safetensors"
+image_encoder = "/workspace/models/image_encoder/model.safetensors"
+dataset_config = "/workspace/imposter/configs/v1/dataset.toml"
+
+# hv_train_network.NetworkTrainer#train で参照されるオプション
+fp8_base = true
+fp8_scaled = true
+
+blocks_to_swap = 20
+split_attn = true
+img_in_txt_in_offloading = true
+
+seed = 42
+mixed_precision = "bf16"
+# full_fp16, full_bf16 も指定可能
+# dtype 関連オプション...
+
+sdpa = true
+# flash_attn = true   # または --sdpa, --xformers, --flash_attn
+network_module = "networks.lora_framepack"
+
+# LoRAの隠れ層のニューロンの数であり、（順伝播時の影響がニューロン数に比例して大きくならないように）重み値を調整する係数の分母でもある。
+# https://deepwiki.com/search/networkdimalphaalpha05025alpha_6132b736-e130-4aec-a97d-90668c4afec1
+network_dim = 8
+# やっぱalphaが低いと学習が遅いというのは勘違いな気がする
+network_alpha = 8
+
+optimizer_type = "adamw8bit"
+learning_rate = 1e-3
+# L40S (VRAM 48GB)のうち32GB程度しか使っていないようなので、gradient_checkpointing = false でも問題ないかもしれない
+# しかし速度がそこまで上がると思えないのでtrueのままで
+gradient_checkpointing = true
+# データのロードが律速になっている印象はないが、RunPodのvCPU数 = 16に合わせてみる
+max_data_loader_n_workers = 1
+persistent_data_loader_workers = true
+# どうせ途中で止めるので...
+max_train_steps = 2000
+
+timestep_sampling = "shift"
+discrete_flow_shift = 7.0
+# データセットのサイズを変更して試しているので steps数指定の方が良い
+# 100で良い、仮に200づつしか使わなくても、最新の状況を見て学習を進めるか止めるか判断すると思うので
+save_every_n_steps = 100
+
+# 途中から学習再開できるように（初めから有効にしたかった...）
+save_state = true
+save_state_on_train_end = true
+
+# 結局5,6位がいい感じに生成できるのでそれに合わせる。
+latent_window_size = 5
+f1 = false
+
+output_dir = "output"
+output_name = "imposter-v1"
+log_with = "wandb"
+log_tracker_name = "imposter"
+log_config = true
+
+huggingface_repo_id = "sawara-dev/imposter-models"
+huggingface_repo_type = "model"
+huggingface_path_in_repo = "/"
+save_state_to_huggingface = true
+
+# Sampling options
+sample_at_first = true
+sample_every_n_steps = 5
+sample_prompts = "/workspace/imposter/configs/v1/prompts.txt"
+
+fp8_llm = true
+vae_chunk_size = 32
+vae_spatial_tile_sample_min_size = 128
