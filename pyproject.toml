@@ -2,7 +2,7 @@
 name = "imposter"
 version = "0.1.0"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "hatchling",
     "setuptools",

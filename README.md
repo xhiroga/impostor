@@ -16,4 +16,7 @@ git clone https://github.com/xhiroga/imposter
 cd imposter
 uv pip install hatchling
 uv sync
+zellij  # or tmux
+make models
+make train
 ```

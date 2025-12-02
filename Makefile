@@ -1,6 +1,6 @@
 include .env	# TMP, MODEL_PATH
 
-CONFIG_FILE ?= /workspace/imposter/configs/v19/config.toml
+CONFIG_FILE ?= /workspace/imposter/configs/v1/config.toml
 MODEL_PATH ?= /workspace/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
 TMP ?= /workspace/tmp
