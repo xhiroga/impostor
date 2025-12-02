@@ -82,7 +82,8 @@ cache: .venv $(models)
 	uv run -m musubi_tuner.fpack_cache_latents \
 		--dataset_config $$DATASET_CONFIG \
 		--vae $$VAE \
-		--image_encoder $$IMAGE_ENCODER
+		--image_encoder $$IMAGE_ENCODER \
+		--vae_chunk_size 32 --vae_tiling
 
 	uv run -m musubi_tuner.fpack_cache_text_encoder_outputs \
 		--dataset_config $$DATASET_CONFIG \
