@@ -18,5 +18,6 @@ uv pip install hatchling
 uv sync
 zellij  # or tmux
 make models
+make cache
 make train
 ```
