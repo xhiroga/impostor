@@ -12,7 +12,8 @@ dependencies = [
     "jinja2-cli>=0.8.2",
     "wandb>=0.21.1",
     "accelerate",
-    "musubi-tuner"
+    "musubi-tuner",
+    "hf-transfer>=0.1.9",
 ]
 
 [tool.uv]
