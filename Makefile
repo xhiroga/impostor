@@ -104,3 +104,6 @@ $(models):
 	uvx --from "huggingface_hub[cli]" hf download $(REPO) $(FILE) --local-dir $(TMP)/$(REPO)
 	mkdir -p $(dir $@)
 	mv $(TMP)/$(REPO)/$(FILE) $@
+
+app:
+	@PYTHONPATH=demo uv run python -m app

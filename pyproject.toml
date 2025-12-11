@@ -14,6 +14,9 @@ dependencies = [
     "accelerate",
     "musubi-tuner",
     "hf-transfer>=0.1.9",
+    "gradio>=6.1.0",
+    "pillow>=12.0.0",
+    "opencv-python>=4.10.0.84",
 ]
 
 [tool.uv]

@@ -2,3 +2,4 @@
 output/
 wandb/
 .env
+__pycache__
