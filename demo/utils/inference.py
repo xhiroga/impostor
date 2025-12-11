@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 import time
+import tempfile
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +11,7 @@ from typing import Iterable, Optional, Tuple
 
 import torch
 import tomllib
+from PIL import Image
 
 from musubi_tuner import fpack_generate_video as fpack
 from musubi_tuner.utils.device_utils import clean_memory_on_device
@@ -82,7 +85,7 @@ def _parse_args(cli_args: Iterable[str]):
 
 def _prepare_cli_args(
     prompt: str,
-    lora_paths: list[str],
+    lora_paths: list[str] | None,
     save_dir: Path,
     negative_prompt: str,
     cfg: FramePackConfig,
@@ -124,10 +127,11 @@ def _prepare_cli_args(
         str(infer_steps),
         "--sample_solver",
         sample_solver,
-        "--lora_weight",
     ]
-    cli_args.extend(lora_paths)
-    cli_args.extend(["--lora_multiplier", *[str(m) for m in lora_multipliers]])
+    if lora_paths:
+        cli_args.append("--lora_weight")
+        cli_args.extend(lora_paths)
+        cli_args.extend(["--lora_multiplier", *[str(m) for m in lora_multipliers]])
 
     if negative_prompt:
         cli_args.extend(["--negative_prompt", negative_prompt])
@@ -163,8 +167,9 @@ def _prepare_cli_args(
 
 def run_framepack_inference(
     prompt: str,
-    lora_path: str | Path,
+    image: Image.Image,
     *,
+    lora_path: str | Path | None = None,
     negative_prompt: str = "",
     config_path: Path = DEFAULT_CONFIG_PATH,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
@@ -178,10 +183,11 @@ def run_framepack_inference(
     sample_solver: str = "unipc",
 ) -> Path:
     """
-    FramePack + LoRA で動画を生成するユーティリティ。
+    FramePack で image2video を行うユーティリティ。
 
     Gradio コールバックから直接呼ぶことを想定。
     戻り値は生成された mp4 ファイルのパス。
+    入力画像は一時ファイルにのみ保存し、生成後は削除する。
     """
 
     config_path = Path(config_path)
@@ -190,22 +196,30 @@ def run_framepack_inference(
     cfg = _load_framepack_config(config_path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    lora_list = _as_list(lora_path)
-    for lp in lora_list:
-        if not Path(lp).exists():
-            raise FileNotFoundError(f"LoRA weight not found: {lp}")
-
-    multiplier_list = (
-        lora_multiplier
-        if isinstance(lora_multiplier, Sequence) and not isinstance(lora_multiplier, (str, bytes))
-        else [lora_multiplier]  # type: ignore[arg-type]
-    )
-    if len(multiplier_list) == 1 and len(lora_list) > 1:
-        multiplier_list = list(multiplier_list) * len(lora_list)
+    lora_list = None
+    multiplier_list: list[float] = []
+    if lora_path is not None:
+        lora_list = _as_list(lora_path)
+        for lp in lora_list:
+            if not Path(lp).exists():
+                raise FileNotFoundError(f"LoRA weight not found: {lp}")
+        multiplier_list = (
+            lora_multiplier
+            if isinstance(lora_multiplier, Sequence) and not isinstance(lora_multiplier, (str, bytes))
+            else [lora_multiplier]  # type: ignore[arg-type]
+        )
+        if len(multiplier_list) == 1 and len(lora_list) > 1:
+            multiplier_list = list(multiplier_list) * len(lora_list)
 
     # 保存先ディレクトリを一意にする（タイムスタンプを subdir に付与）
     time_suffix = time.strftime("%Y%m%d_%H%M%S")
-    save_dir = output_dir / f"{Path(lora_list[0]).stem}_{time_suffix}"
+    tag = Path(lora_list[0]).stem if lora_list else "nolora"
+    save_dir = output_dir / f"{tag}_{time_suffix}"
+
+    # 入力画像を一時ファイルに保存（推論後削除）
+    with tempfile.NamedTemporaryFile(prefix="framepack_i2v_", suffix=".png", delete=False) as tmp:
+        image.save(tmp.name)
+        temp_image_path = tmp.name
 
     cli_args = _prepare_cli_args(
         prompt=prompt,
@@ -217,35 +231,39 @@ def run_framepack_inference(
         video_seconds=video_seconds,
         fps=fps,
         infer_steps=infer_steps,
-        lora_multipliers=[float(m) for m in multiplier_list],
+        lora_multipliers=[float(m) for m in multiplier_list] if lora_list else [],
         seed=seed,
         device=device,
         sample_solver=sample_solver,
     )
+    cli_args.extend(["--image_path", temp_image_path])
 
-    args = _parse_args(cli_args)
+    try:
+        args = _parse_args(cli_args)
 
-    resolved_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    args.device = torch.device(resolved_device)
+        resolved_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        args.device = torch.device(resolved_device)
 
-    gen_settings = fpack.get_generation_settings(args)
-    vae, latent = fpack.generate(args, gen_settings)
+        gen_settings = fpack.get_generation_settings(args)
+        vae, latent = fpack.generate(args, gen_settings)
 
-    if latent is None or vae is None:
-        raise RuntimeError("generation returned no latent/vae; check arguments.")
+        if latent is None or vae is None:
+            raise RuntimeError("generation returned no latent/vae; check arguments.")
 
-    # decode & save video, captureパスを返す
-    total_latent_sections = int(max(round(video_seconds * 30 / (args.latent_window_size * 4)), 1))
-    video_tensor = fpack.decode_latent(
-        args.latent_window_size,
-        total_latent_sections,
-        args.bulk_decode,
-        vae,
-        latent,
-        gen_settings.device,
-        args.one_frame_inference is not None,
-    )
-    video_path = fpack.save_video(video_tensor, args)
+        total_latent_sections = int(max(round(video_seconds * 30 / (args.latent_window_size * 4)), 1))
+        video_tensor = fpack.decode_latent(
+            args.latent_window_size,
+            total_latent_sections,
+            args.bulk_decode,
+            vae,
+            latent,
+            gen_settings.device,
+            args.one_frame_inference is not None,
+        )
+        video_path = fpack.save_video(video_tensor, args)
+    finally:
+        if "temp_image_path" in locals() and os.path.exists(temp_image_path):
+            os.remove(temp_image_path)
 
     clean_memory_on_device(gen_settings.device)
     return Path(video_path)
