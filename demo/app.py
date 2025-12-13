@@ -4,7 +4,6 @@ Gradio デモ: サンプル動画閲覧 or LoRA付き FramePack 推論の両方�
 
 from __future__ import annotations
 
-import glob
 from pathlib import Path
 from typing import List, Tuple
 
@@ -22,8 +21,11 @@ from utils.inference import run_framepack_inference, load_inference_params
 DEMO_OUTPUT_DIR = Path("/workspace/imposter/demo/output")
 DEMO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# デフォルトで読み込むサンプル動画
-DEFAULT_SAMPLE_VIDEO = Path(__file__).resolve().parent / "data" / "sample" / "inference_sample_girl.mp4"
+# デフォルトで読み込むデータセット／サンプル動画
+DATASET_DIR = Path(__file__).resolve().parent / "data" / "dataset"
+SAMPLE_DIR = Path(__file__).resolve().parent / "data" / "inference-sample"
+DEFAULT_DATASET_VIDEO = DATASET_DIR / "dataset_sample_leopard.mp4"
+DEFAULT_SAMPLE_VIDEO = SAMPLE_DIR / "inference_sample_girl.mp4"
 # フレーム使用枚数（固定値にしたい場合ここを変更）
 FRAME_BUDGET_DEFAULT = 120
 
@@ -32,15 +34,21 @@ INFER_CFG = load_inference_params()
 
 
 # === ユーティリティ ===
+def _scan_videos(dir_path: Path) -> list[str]:
+    """指定ディレクトリ配下の mp4 を再帰で列挙。"""
+    return sorted([str(p) for p in dir_path.glob("**/*.mp4")])
+
+
+def scan_dataset_videos() -> list[str]:
+    return _scan_videos(DATASET_DIR)
+
+
 def scan_sample_videos() -> list[str]:
-    """サンプル／過去生成動画をスキャンしてプルダウンに表示する。"""
-    paths = set()
-    for pattern in [
-        "/workspace/imposter/demo/data/sample/*.mp4",
-        f"{DEMO_OUTPUT_DIR}/**/*.mp4",
-    ]:
-        paths.update(glob.glob(pattern, recursive=True))
-    return sorted(paths)
+    return _scan_videos(SAMPLE_DIR)
+
+
+def scan_output_videos() -> list[str]:
+    return _scan_videos(DEMO_OUTPUT_DIR)
 
 
 def load_frames(video_path: Path | None):
@@ -77,12 +85,18 @@ def overlay_info(frame: Image.Image, yaw: float, pitch: float) -> Image.Image:
 
 
 # 初期サンプルロード
-initial_sample = (
-    DEFAULT_SAMPLE_VIDEO
-    if DEFAULT_SAMPLE_VIDEO.exists()
-    else (VIDEO_PATH if VIDEO_PATH.exists() else None)
-)
-initial_frames, (PATH_YAW, PATH_PITCH) = load_frames(initial_sample)
+if DEFAULT_DATASET_VIDEO.exists():
+    initial_video = DEFAULT_DATASET_VIDEO
+elif DATASET_DIR.exists() and list(DATASET_DIR.glob("**/*.mp4")):
+    initial_video = sorted(DATASET_DIR.glob("**/*.mp4"))[0]
+elif DEFAULT_SAMPLE_VIDEO.exists():
+    initial_video = DEFAULT_SAMPLE_VIDEO
+elif SAMPLE_DIR.exists() and list(SAMPLE_DIR.glob("**/*.mp4")):
+    initial_video = sorted(SAMPLE_DIR.glob("**/*.mp4"))[0]
+else:
+    initial_video = VIDEO_PATH if VIDEO_PATH.exists() else None
+
+initial_frames, (PATH_YAW, PATH_PITCH) = load_frames(initial_video)
 PRECOMPUTED_FRAMES, FRAME_SIZE = initial_frames
 DISPLAY_WIDTH, DISPLAY_HEIGHT = FRAME_SIZE
 
@@ -159,27 +173,44 @@ def run_inference(image):
 
 
 def build_demo() -> gr.Blocks:
-    samples = scan_sample_videos()
+    dataset_videos = scan_dataset_videos()
+    sample_videos = scan_sample_videos()
+    output_videos = scan_output_videos()
+    default_dataset_value = (
+        str(DEFAULT_DATASET_VIDEO)
+        if DEFAULT_DATASET_VIDEO.exists()
+        else (dataset_videos[0] if dataset_videos else None)
+    )
     default_sample_value = (
         str(DEFAULT_SAMPLE_VIDEO)
         if DEFAULT_SAMPLE_VIDEO.exists()
-        else (samples[0] if samples else None)
+        else (sample_videos[0] if sample_videos else None)
     )
+    default_output_value = output_videos[0] if output_videos else None
 
     with gr.Blocks(title="Imposter Demo") as demo:
         gr.Markdown("### Imposter Demo")
 
         mode = gr.Radio(
-            ["サンプルを動かす", "推論して動かす"],
+            ["サンプルを動かす", "推論結果を動かす", "推論して動かす"],
             value="サンプルを動かす",
             label="モードを選択",
         )
 
-        with gr.Row(visible=True) as sample_row:
-            sample_dropdown = gr.Dropdown(
-                samples,
-                value=default_sample_value,
+        with gr.Row(visible=True) as dataset_row:
+            dataset_dropdown = gr.Dropdown(
+                dataset_videos,
+                value=default_dataset_value,
                 label="サンプル動画",
+                scale=4,
+            )
+            dataset_refresh = gr.Button("リロード", scale=0, min_width=96)
+
+        with gr.Row(visible=False) as sample_row:
+            sample_dropdown = gr.Dropdown(
+                sample_videos,
+                value=default_sample_value,
+                label="推論結果サンプル動画",
                 scale=4,
             )
             # ボタン幅を小さく保つため scale=0 と min_width を指定
@@ -187,6 +218,13 @@ def build_demo() -> gr.Blocks:
 
         with gr.Column(visible=False) as infer_col:
             image_input = gr.Image(type="pil", label="入力画像 (image2video)", sources=["upload", "clipboard"])
+            output_dropdown = gr.Dropdown(
+                output_videos,
+                value=default_output_value,
+                label="推論結果動画",
+                scale=4,
+            )
+            output_refresh = gr.Button("リロード", scale=0, min_width=96)
             infer_button = gr.Button("推論スタート", variant="primary")
             spinner = gr.HTML(
                 """<div style="text-align:center;">
@@ -227,18 +265,45 @@ def build_demo() -> gr.Blocks:
         def toggle_mode(m):
             return (
                 gr.update(visible=m == "サンプルを動かす"),
+                gr.update(visible=m == "推論結果を動かす"),
                 gr.update(visible=m == "推論して動かす"),
             )
 
-        mode.change(toggle_mode, [mode], [sample_row, infer_col])
+        mode.change(toggle_mode, [mode], [dataset_row, sample_row, infer_col])
 
-        # サンプル再読み込み
+        # モード変更時に現在選択中の動画を読み直す
+        def load_by_mode(m, d, s, o):
+            if m == "サンプルを動かす":
+                return switch_video(d)
+            if m == "推論結果を動かす":
+                return switch_video(s)
+            return switch_video(o)
+
+        mode.change(
+            load_by_mode,
+            [mode, dataset_dropdown, sample_dropdown, output_dropdown],
+            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget_state, image],
+        )
+
+        # サンプル／データセット再読み込み
+        dataset_refresh.click(lambda: gr.update(choices=scan_dataset_videos()), None, [dataset_dropdown])
         sample_refresh.click(lambda: gr.update(choices=scan_sample_videos()), None, [sample_dropdown])
+        output_refresh.click(lambda: gr.update(choices=scan_output_videos()), None, [output_dropdown])
 
-        # サンプル選択で動画差し替え
+        # ドロップダウン選択で動画差し替え
+        dataset_dropdown.change(
+            switch_video,
+            [dataset_dropdown],
+            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget_state, image],
+        )
         sample_dropdown.change(
             switch_video,
             [sample_dropdown],
+            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget_state, image],
+        )
+        output_dropdown.change(
+            switch_video,
+            [output_dropdown],
             [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget_state, image],
         )
 

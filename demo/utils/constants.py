@@ -11,7 +11,7 @@ MAX_PITCH = 75
 # プロジェクトルートとサンプル動画パス
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT_DIR / "data"
-VIDEO_PATH = DATA_DIR / "sample" / "sample-girl.mp4"
+VIDEO_PATH = DATA_DIR / "inference-sample" / "inference_sample_girl.mp4"
 
 __all__ = [
     "FRAME_COUNT",
