@@ -16,11 +16,14 @@ from utils.camera_path import generate_path
 from utils.constants import FRAME_COUNT, MAX_PITCH, MIN_PITCH, VIDEO_PATH
 from utils.frame_picker import pick_frame_index
 from utils.video_loader import fallback_frames, load_video_frames
-from utils.inference import run_framepack_inference
+from utils.inference import run_framepack_inference, load_inference_params
 
-# 生成結果の保存先（ユーザ指定）
+# 生成結果の保存先（ユーザ指定のデフォルト）
 DEMO_OUTPUT_DIR = Path("/workspace/imposter/demo/output")
 DEMO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# 推論パラメータを config から読み込む
+INFER_CFG = load_inference_params()
 
 
 # === ユーティリティ ===
@@ -114,29 +117,34 @@ def switch_video(video_path: str | None):
     )
 
 
-def run_inference(prompt, lora_path, image, steps, seconds, fps, height, width, seed, solver, negative):
+def _resolve_lora_path() -> Path | None:
+    """モジュール先頭で指定した LoRA パスを検証して Path を返す。"""
+    lora_path_cfg = INFER_CFG.get("lora_weight")
+    if isinstance(lora_path_cfg, (list, tuple)):
+        lora_path_cfg = lora_path_cfg[0] if lora_path_cfg else None
+    if not lora_path_cfg:
+        return None
+    lp = Path(lora_path_cfg)
+    if not lp.exists():
+        raise gr.Error(f"LoRA が見つかりません: {lp}")
+    return lp
+
+
+def run_inference(image):
     """推論ボタンクリック時の処理。"""
     if image is None:
         raise gr.Error("入力画像を指定してください")
 
     gr.Progress(track_tqdm=True)
 
-    lora_path = Path(lora_path) if lora_path else None
-    if lora_path is not None and not lora_path.exists():
-        raise gr.Error(f"LoRA が見つかりません: {lora_path}")
+    lora_path = _resolve_lora_path()
+    # config 側で上書きされた保存先があれば使う
+    output_dir = INFER_CFG.get("save_path") or DEMO_OUTPUT_DIR
 
     video_path = run_framepack_inference(
-        prompt=prompt,
+        prompt=INFER_CFG["prompt"],
         image=image,
-        lora_path=lora_path,
-        infer_steps=int(steps),
-        video_seconds=float(seconds),
-        fps=int(fps),
-        video_size=(int(height), int(width)),
-        seed=int(seed) if seed else None,
-        sample_solver=solver,
-        negative_prompt=negative or "",
-        output_dir=DEMO_OUTPUT_DIR,
+        output_dir=Path(output_dir),
     )
     (frames, size), (path_yaw, path_pitch) = load_frames(video_path)
     frame_budget_max = len(frames)
@@ -149,7 +157,6 @@ def run_inference(prompt, lora_path, image, steps, seconds, fps, height, width, 
         step=max(1, frame_budget_max // 30),
     )
     return (
-        str(video_path),
         frames,
         path_yaw,
         path_pitch,
@@ -163,34 +170,27 @@ def run_inference(prompt, lora_path, image, steps, seconds, fps, height, width, 
 def build_demo() -> gr.Blocks:
     samples = scan_sample_videos()
 
-    with gr.Blocks(title="Imposter FramePack Demo") as demo:
-        gr.Markdown("### サンプル動画 / 推論切替デモ")
+    with gr.Blocks(title="Imposter Demo") as demo:
+        gr.Markdown("### Imposter Demo")
 
         mode = gr.Radio(
-            ["サンプルを動かす", "LoRAで推論する"],
+            ["サンプルを動かす", "推論して動かす"],
             value="サンプルを動かす",
             label="モードを選択",
         )
 
         with gr.Row(visible=True) as sample_row:
-            sample_dropdown = gr.Dropdown(samples, value=samples[0] if samples else None, label="サンプル動画")
-            sample_refresh = gr.Button("再スキャン")
+            sample_dropdown = gr.Dropdown(
+                samples,
+                value=samples[0] if samples else None,
+                label="サンプル動画",
+                scale=4,
+            )
+            # ボタン幅を小さく保つため scale=0 と min_width を指定
+            sample_refresh = gr.Button("リロード", scale=0, min_width=96)
 
         with gr.Column(visible=False) as infer_col:
-            prompt = gr.Textbox(label="プロンプト", value="a girl walking in the snow, cinematic")
             image_input = gr.Image(type="pil", label="入力画像 (image2video)", sources=["upload", "clipboard"])
-            lora_path = gr.Textbox(label="LoRA パス（空欄なら base モデルのみ）", value="", placeholder="/workspace/models/lora/foo.safetensors")
-            with gr.Row():
-                steps = gr.Slider(5, 40, value=25, step=1, label="ステップ数")
-                seed = gr.Textbox(label="Seed (空でランダム)", value="")
-            with gr.Row():
-                seconds = gr.Slider(2.0, 8.0, value=5.0, step=0.5, label="動画秒数")
-                fps = gr.Slider(12, 30, value=30, step=1, label="FPS")
-            with gr.Row():
-                height = gr.Slider(128, 512, value=256, step=8, label="高さ")
-                width = gr.Slider(128, 512, value=256, step=8, label="幅")
-            solver = gr.Dropdown(["unipc", "dpm++", "vanilla"], value="unipc", label="サンプラー")
-            negative = gr.Textbox(label="ネガティブプロンプト", value="")
             infer_button = gr.Button("推論スタート", variant="primary")
             spinner = gr.HTML(
                 """<div style="text-align:center;">
@@ -230,7 +230,6 @@ def build_demo() -> gr.Blocks:
         )
 
         info = gr.Textbox(label="ステータス", value="Ready", interactive=False)
-        current_video = gr.Textbox(label="現在の動画パス", value=str(VIDEO_PATH if VIDEO_PATH.exists() else ""), interactive=False)
 
         # 状態保持
         frames_state = gr.State(PRECOMPUTED_FRAMES)
@@ -242,7 +241,7 @@ def build_demo() -> gr.Blocks:
         def toggle_mode(m):
             return (
                 gr.update(visible=m == "サンプルを動かす"),
-                gr.update(visible=m == "LoRAで推論する"),
+                gr.update(visible=m == "推論して動かす"),
             )
 
         mode.change(toggle_mode, [mode], [sample_row, infer_col])
@@ -267,8 +266,8 @@ def build_demo() -> gr.Blocks:
         infer_button.click(show_spinner, outputs=[spinner])
         infer_button.click(
             run_inference,
-            [prompt, lora_path, image_input, steps, seconds, fps, height, width, seed, solver, negative],
-            [current_video, frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget, image, info],
+            [image_input],
+            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget, image, info],
         ).then(hide_spinner, outputs=[spinner])
 
         # Live updates for sliders

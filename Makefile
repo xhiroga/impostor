@@ -5,6 +5,8 @@ MODEL_PATH ?= /workspace/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
 TMP ?= /workspace/tmp
 
+LORA_DIR ?= impostor-v2-step00000800-state
+
 .ONESHELL:
 .PHONY: train cache
 
@@ -22,7 +24,8 @@ models = \
 	$(MODEL_PATH)/text_encoder/model-00003-of-00004.safetensors \
 	$(MODEL_PATH)/text_encoder/model-00004-of-00004.safetensors \
 	$(MODEL_PATH)/text_encoder_2/model.safetensors \
-	$(MODEL_PATH)/image_encoder/model.safetensors
+	$(MODEL_PATH)/image_encoder/model.safetensors \
+	$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors
 
 $(MODEL_PATH)/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors: REPO=lllyasviel/FramePackI2V_HY
 $(MODEL_PATH)/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors: FILE=diffusion_pytorch_model-00001-of-00003.safetensors
@@ -55,6 +58,9 @@ $(MODEL_PATH)/text_encoder_2/model.safetensors: FILE=text_encoder_2/model.safete
 
 $(MODEL_PATH)/image_encoder/model.safetensors: REPO=lllyasviel/flux_redux_bfl
 $(MODEL_PATH)/image_encoder/model.safetensors: FILE=image_encoder/model.safetensors
+
+$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: REPO=sawara-dev/impostor-models
+$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: FILE=$(LORA_DIR)/model.safetensors
 
 train: .venv
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
@@ -100,7 +106,7 @@ cache: .venv $(models)
 
 models: $(models)
 $(models):
-	if uvx --from "huggingface_hub[cli]" hf whoami | grep -q 'Not logged in'; then uvx --from "huggingface_hub[cli]" hf login; fi
+	if uvx --from "huggingface_hub[cli]" hf auth whoami | grep -q 'Not logged in'; then uvx --from "huggingface_hub[cli]" hf auth login; fi
 	uvx --from "huggingface_hub[cli]" hf download $(REPO) $(FILE) --local-dir $(TMP)/$(REPO)
 	mkdir -p $(dir $@)
 	mv $(TMP)/$(REPO)/$(FILE) $@

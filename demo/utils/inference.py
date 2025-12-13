@@ -5,9 +5,8 @@ import time
 import tempfile
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple, Any, Dict
 
 import torch
 import tomllib
@@ -18,49 +17,50 @@ from musubi_tuner.utils.device_utils import clean_memory_on_device
 
 # プロジェクトルートとデフォルト設定ファイル
 ROOT_DIR = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG_PATH = ROOT_DIR / "configs" / "v1" / "config.toml"
-# Gradio からの呼び出し時は、このディレクトリ配下に生成結果を置く
+# デモ用推論設定をここから読む
+DEFAULT_CONFIG_PATH = ROOT_DIR / "demo" / "configs" / "inference.toml"
+# Gradio からの呼び出し時は、このディレクトリ配下に生成結果を置く（デフォルト）
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "output" / "gradio"
 
 
-@dataclass
-class FramePackConfig:
-    """FramePack 推論で使う主要パスと既定値。"""
-
-    dit: Path
-    vae: Path
-    text_encoder1: Path
-    text_encoder2: Path
-    image_encoder: Path
-    vae_chunk_size: Optional[int] = None
-    vae_spatial_tile_sample_min_size: Optional[int] = None
-    fp8: bool = False
-    fp8_scaled: bool = False
-    fp8_llm: bool = False
-    blocks_to_swap: int = 0
-    attn_mode: str = "torch"  # torch / sdpa / xformers / flash / sageattn
-
-
-def _load_framepack_config(config_path: Path = DEFAULT_CONFIG_PATH) -> FramePackConfig:
-    """toml からベースモデルのパス類を読み込む。"""
+def load_inference_params(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """推論時の可変パラメータを config のトップレベルから読み取る。"""
 
     with open(config_path, "rb") as f:
         cfg = tomllib.load(f)
 
-    return FramePackConfig(
-        dit=Path(cfg["dit"]),
-        vae=Path(cfg["vae"]),
-        text_encoder1=Path(cfg["text_encoder1"]),
-        text_encoder2=Path(cfg["text_encoder2"]),
-        image_encoder=Path(cfg["image_encoder"]),
-        vae_chunk_size=cfg.get("vae_chunk_size"),
-        vae_spatial_tile_sample_min_size=cfg.get("vae_spatial_tile_sample_min_size"),
-        fp8=cfg.get("fp8_base", False),
-        fp8_scaled=cfg.get("fp8_scaled", False),
-        fp8_llm=cfg.get("fp8_llm", False),
-        blocks_to_swap=cfg.get("blocks_to_swap", 0),
-        attn_mode="sdpa" if cfg.get("sdpa") else "torch",
-    )
+    def _fetch(key: str, default=None):
+        return cfg.get(key, default)
+
+    # LoRA はトップレベルの lora_weight のみを見る
+    lora_weight = _fetch("lora_weight", None)
+
+    # save_path: 空/未指定なら None（呼び出し側でデフォルトにフォールバック）
+    save_path_raw = _fetch("save_path", None)
+    save_path = Path(save_path_raw) if save_path_raw else None
+
+    # video_size が配列で与えられる場合を優先
+    video_size_val = _fetch("video_size", None)
+    if isinstance(video_size_val, (list, tuple)) and len(video_size_val) == 2:
+        height_val, width_val = int(video_size_val[0]), int(video_size_val[1])
+    else:
+        height_val = int(_fetch("height", 256))
+        width_val = int(_fetch("width", 256))
+
+    return {
+        "prompt": _fetch("prompt", "a girl walking in the snow, cinematic"),
+        "negative_prompt": _fetch("negative_prompt", ""),
+        "video_seconds": float(_fetch("video_seconds", 5.0)),
+        "fps": int(_fetch("fps", 30)),
+        "height": height_val,
+        "width": width_val,
+        "infer_steps": int(_fetch("infer_steps", 25)),
+        "seed": int(_fetch("seed")) if _fetch("seed") not in (None, "", "null") else None,
+        "sample_solver": _fetch("sample_solver", "unipc"),
+        "lora_weight": lora_weight,
+        "lora_multiplier": float(_fetch("lora_multiplier", 1.0)),
+        "save_path": save_path,
+    }
 
 
 def _as_list(value: str | Path | Sequence[str | Path]) -> list[str]:
@@ -83,104 +83,92 @@ def _parse_args(cli_args: Iterable[str]):
     return args
 
 
-def _prepare_cli_args(
-    prompt: str,
-    lora_paths: list[str] | None,
-    save_dir: Path,
-    negative_prompt: str,
-    cfg: FramePackConfig,
-    video_size: Tuple[int, int],
-    video_seconds: float,
-    fps: int,
-    infer_steps: int,
-    lora_multipliers: list[float],
-    seed: Optional[int],
-    device: Optional[str],
-    sample_solver: str,
-) -> list[str]:
-    """CLI 互換の引数リストを組み立てる。"""
+def _config_to_cli_args(cfg: Dict[str, Any], image_path: Path, default_output_dir: Path) -> tuple[list[str], Path]:
+    """
+    TOML の内容をそのまま musubi_tuner に渡す CLI 引数列へ変換する。
+    - キー名は変えずに `--key value` 形式で渡す
+    - bool は \"true\"/\"false\" に変換
+    - list / tuple は `--key v1 v2 ...` として渡す
+    - save_path が未指定なら default_output_dir/ {tag}_{timestamp} を設定する
+    """
 
-    h, w = video_size
-    cli_args: list[str] = [
-        "--dit",
-        str(cfg.dit),
-        "--vae",
-        str(cfg.vae),
-        "--text_encoder1",
-        str(cfg.text_encoder1),
-        "--text_encoder2",
-        str(cfg.text_encoder2),
-        "--image_encoder",
-        str(cfg.image_encoder),
-        "--prompt",
-        prompt,
-        "--save_path",
-        str(save_dir),
-        "--video_size",
-        str(h),
-        str(w),
-        "--video_seconds",
-        str(video_seconds),
-        "--fps",
-        str(fps),
-        "--infer_steps",
-        str(infer_steps),
-        "--sample_solver",
-        sample_solver,
-    ]
-    if lora_paths:
-        cli_args.append("--lora_weight")
-        cli_args.extend(lora_paths)
-        cli_args.extend(["--lora_multiplier", *[str(m) for m in lora_multipliers]])
+    cfg = dict(cfg)  # shallow copy
+    def _first_lora_path() -> Optional[Path]:
+        lw = cfg.get("lora_weight")
+        if lw is None:
+            return None
+        if isinstance(lw, (list, tuple)):
+            return Path(lw[0])
+        return Path(lw)
 
-    if negative_prompt:
-        cli_args.extend(["--negative_prompt", negative_prompt])
-    if seed is not None:
-        cli_args.extend(["--seed", str(seed)])
-    if device is not None:
-        cli_args.extend(["--device", device])
+    # save_path を決定
+    base_save = cfg.get("save_path")
+    if not base_save:
+        time_suffix = time.strftime("%Y%m%d_%H%M%S")
+        tag = _first_lora_path().stem if _first_lora_path() else "nolora"
+        base_save = str(default_output_dir / f"{tag}_{time_suffix}")
+        cfg["save_path"] = base_save
 
-    # config 由来のオプション
-    if cfg.vae_chunk_size is not None:
-        cli_args.extend(["--vae_chunk_size", str(cfg.vae_chunk_size)])
-    if cfg.vae_spatial_tile_sample_min_size is not None:
-        cli_args.extend(
-            [
-                "--vae_spatial_tile_sample_min_size",
-                str(cfg.vae_spatial_tile_sample_min_size),
-                "--vae_tiling",
-            ]
-        )
-    if cfg.fp8:
-        cli_args.append("--fp8")
-    if cfg.fp8_scaled:
-        cli_args.append("--fp8_scaled")
-    if cfg.fp8_llm:
-        cli_args.append("--fp8_llm")
-    if cfg.blocks_to_swap:
-        cli_args.extend(["--blocks_to_swap", str(cfg.blocks_to_swap)])
-    if cfg.attn_mode:
-        cli_args.extend(["--attn_mode", cfg.attn_mode])
+    save_path = Path(base_save)
+    save_path.mkdir(parents=True, exist_ok=True)
 
-    return cli_args
+    args: list[str] = []
+
+    flag_keys = {
+        "fp8",
+        "fp8_scaled",
+        "fp8_llm",
+        "vae_tiling",
+        "bulk_decode",
+        "use_pinned_memory_for_block_swap",
+        "compile_fullgraph",
+        "compile",
+        "f1",
+    }
+
+    def push(k: str, v: Any):
+        if v is None:
+            return
+
+        # special handling
+        if k == "sdpa":
+            if v:
+                args.extend(["--attn_mode", "sdpa"])
+            return
+
+        if k in flag_keys:
+            if v:
+                args.append(f"--{k}")
+            return
+
+        if isinstance(v, bool):
+            # booleans that are not flag_keys: pass as true/false string
+            args.extend([f"--{k}", str(v).lower()])
+        elif isinstance(v, (list, tuple)):
+            args.append(f"--{k}")
+            args.extend(str(x) for x in v)
+        else:
+            args.extend([f"--{k}", str(v)])
+
+    # トップレベルのみをそのまま CLI へ
+    for key, val in cfg.items():
+        if key == "inference":
+            continue  # 明示的に無視
+        push(key, val)
+
+    # 画像パスは常に末尾に追加
+    push("image_path", str(image_path))
+
+    return args, save_path
 
 
 def run_framepack_inference(
     prompt: str,
     image: Image.Image,
     *,
-    lora_path: str | Path | None = None,
-    negative_prompt: str = "",
     config_path: Path = DEFAULT_CONFIG_PATH,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
-    video_size: Tuple[int, int] = (256, 256),
-    video_seconds: float = 5.0,
-    fps: int = 30,
-    infer_steps: int = 25,
-    lora_multiplier: float | Sequence[float] = 1.0,
-    seed: Optional[int] = None,
     device: Optional[str] = None,
-    sample_solver: str = "unipc",
 ) -> Path:
     """
     FramePack で image2video を行うユーティリティ。
@@ -193,50 +181,26 @@ def run_framepack_inference(
     config_path = Path(config_path)
     output_dir = Path(output_dir)
 
-    cfg = _load_framepack_config(config_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    with open(config_path, "rb") as f:
+        cfg = tomllib.load(f)
 
-    lora_list = None
-    multiplier_list: list[float] = []
-    if lora_path is not None:
-        lora_list = _as_list(lora_path)
-        for lp in lora_list:
+    # LoRA の存在チェック（設定にある場合のみ）
+    lora_val = cfg.get("inference", {}).get("lora_weight") or cfg.get("lora_weight")
+    if lora_val:
+        for lp in _as_list(lora_val):
             if not Path(lp).exists():
                 raise FileNotFoundError(f"LoRA weight not found: {lp}")
-        multiplier_list = (
-            lora_multiplier
-            if isinstance(lora_multiplier, Sequence) and not isinstance(lora_multiplier, (str, bytes))
-            else [lora_multiplier]  # type: ignore[arg-type]
-        )
-        if len(multiplier_list) == 1 and len(lora_list) > 1:
-            multiplier_list = list(multiplier_list) * len(lora_list)
-
-    # 保存先ディレクトリを一意にする（タイムスタンプを subdir に付与）
-    time_suffix = time.strftime("%Y%m%d_%H%M%S")
-    tag = Path(lora_list[0]).stem if lora_list else "nolora"
-    save_dir = output_dir / f"{tag}_{time_suffix}"
 
     # 入力画像を一時ファイルに保存（推論後削除）
     with tempfile.NamedTemporaryFile(prefix="framepack_i2v_", suffix=".png", delete=False) as tmp:
         image.save(tmp.name)
         temp_image_path = tmp.name
 
-    cli_args = _prepare_cli_args(
-        prompt=prompt,
-        lora_paths=lora_list,
-        save_dir=save_dir,
-        negative_prompt=negative_prompt,
-        cfg=cfg,
-        video_size=video_size,
-        video_seconds=video_seconds,
-        fps=fps,
-        infer_steps=infer_steps,
-        lora_multipliers=[float(m) for m in multiplier_list] if lora_list else [],
-        seed=seed,
-        device=device,
-        sample_solver=sample_solver,
-    )
-    cli_args.extend(["--image_path", temp_image_path])
+    cli_args, _ = _config_to_cli_args(cfg, Path(temp_image_path), output_dir)
+
+    # device は明示指定があれば上書き
+    if device is not None:
+        cli_args.extend(["--device", device])
 
     try:
         args = _parse_args(cli_args)
@@ -250,7 +214,9 @@ def run_framepack_inference(
         if latent is None or vae is None:
             raise RuntimeError("generation returned no latent/vae; check arguments.")
 
-        total_latent_sections = int(max(round(video_seconds * 30 / (args.latent_window_size * 4)), 1))
+        video_seconds = float(getattr(args, "video_seconds", 5.0))
+        fps = float(getattr(args, "fps", 30))
+        total_latent_sections = int(max(round(video_seconds * fps / (args.latent_window_size * 4)), 1))
         video_tensor = fpack.decode_latent(
             args.latent_window_size,
             total_latent_sections,
@@ -269,4 +235,4 @@ def run_framepack_inference(
     return Path(video_path)
 
 
-__all__ = ["run_framepack_inference"]
+__all__ = ["run_framepack_inference", "load_inference_params"]
