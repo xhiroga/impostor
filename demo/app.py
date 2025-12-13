@@ -322,12 +322,12 @@ def build_demo() -> gr.Blocks:
         ).then(hide_spinner, outputs=[spinner])
 
         # Live updates for sliders
-        yaw_slider.input(
+        yaw_slider.change(
             update_view,
             [yaw_slider, pitch_slider, frame_budget_state, frames_state, path_yaw_state, path_pitch_state],
             [image],
         )
-        pitch_slider.input(
+        pitch_slider.change(
             update_view,
             [yaw_slider, pitch_slider, frame_budget_state, frames_state, path_yaw_state, path_pitch_state],
             [image],
