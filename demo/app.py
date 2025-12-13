@@ -22,6 +22,11 @@ from utils.inference import run_framepack_inference, load_inference_params
 DEMO_OUTPUT_DIR = Path("/workspace/imposter/demo/output")
 DEMO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# デフォルトで読み込むサンプル動画
+DEFAULT_SAMPLE_VIDEO = Path(__file__).resolve().parent / "data" / "sample" / "inference_sample_girl.mp4"
+# フレーム使用枚数（固定値にしたい場合ここを変更）
+FRAME_BUDGET_DEFAULT = 120
+
 # 推論パラメータを config から読み込む
 INFER_CFG = load_inference_params()
 
@@ -31,8 +36,7 @@ def scan_sample_videos() -> list[str]:
     """サンプル／過去生成動画をスキャンしてプルダウンに表示する。"""
     paths = set()
     for pattern in [
-        "/workspace/imposter/data/sample/*.mp4",
-        "/workspace/imposter/output/**/*.mp4",
+        "/workspace/imposter/demo/data/sample/*.mp4",
         f"{DEMO_OUTPUT_DIR}/**/*.mp4",
     ]:
         paths.update(glob.glob(pattern, recursive=True))
@@ -73,25 +77,25 @@ def overlay_info(frame: Image.Image, yaw: float, pitch: float) -> Image.Image:
 
 
 # 初期サンプルロード
-initial_frames, (PATH_YAW, PATH_PITCH) = load_frames(VIDEO_PATH if VIDEO_PATH.exists() else None)
+initial_sample = (
+    DEFAULT_SAMPLE_VIDEO
+    if DEFAULT_SAMPLE_VIDEO.exists()
+    else (VIDEO_PATH if VIDEO_PATH.exists() else None)
+)
+initial_frames, (PATH_YAW, PATH_PITCH) = load_frames(initial_sample)
 PRECOMPUTED_FRAMES, FRAME_SIZE = initial_frames
 DISPLAY_WIDTH, DISPLAY_HEIGHT = FRAME_SIZE
 
 
 def update_view(yaw: float, pitch: float, frame_budget: int, frames: List[Image.Image], path_yaw, path_pitch):
-    """フレーム配列と経路を受け取り表示用イメージとテキストを返す。"""
+    """フレーム配列と経路を受け取り表示用イメージを返す。"""
     if not frames:
         frames = [fallback_frames()[0][0]]
         path_yaw, path_pitch = generate_path(len(frames))
 
     idx = pick_frame_index(yaw, pitch, frame_budget, np.array(path_yaw), np.array(path_pitch))
     frame = overlay_info(frames[idx], yaw, pitch)
-    info = (
-        f"Frame {idx+1:03d}/{len(frames)}  "
-        f"(利用: {int(frame_budget)} 枚)  "
-        f"yaw {path_yaw[idx]:.1f}°, pitch {path_pitch[idx]:.1f}°"
-    )
-    return frame, info
+    return frame
 
 
 def switch_video(video_path: str | None):
@@ -99,21 +103,15 @@ def switch_video(video_path: str | None):
     path = Path(video_path) if video_path else None
     (frames, size), (path_yaw, path_pitch) = load_frames(path)
     frame_budget_max = len(frames)
+    frame_budget_val = min(FRAME_BUDGET_DEFAULT, frame_budget_max)
     first_frame = overlay_info(frames[0], 0, 10)
-    slider_update = gr.update(
-        minimum=2,
-        maximum=frame_budget_max,
-        value=min(120, frame_budget_max),
-        step=max(1, frame_budget_max // 30),
-    )
     return (
         frames,
         path_yaw,
         path_pitch,
         size,
-        slider_update,
+        frame_budget_val,
         first_frame,
-        f"読み込み完了: {path}" if path else "読み込み失敗",
     )
 
 
@@ -148,27 +146,25 @@ def run_inference(image):
     )
     (frames, size), (path_yaw, path_pitch) = load_frames(video_path)
     frame_budget_max = len(frames)
+    frame_budget_val = min(FRAME_BUDGET_DEFAULT, frame_budget_max)
     first_frame = overlay_info(frames[0], 0, 10)
-    status = f"推論完了: {video_path}"
-    slider_update = gr.update(
-        minimum=2,
-        maximum=frame_budget_max,
-        value=min(120, frame_budget_max),
-        step=max(1, frame_budget_max // 30),
-    )
     return (
         frames,
         path_yaw,
         path_pitch,
         size,
-        slider_update,
+        frame_budget_val,
         first_frame,
-        status,
     )
 
 
 def build_demo() -> gr.Blocks:
     samples = scan_sample_videos()
+    default_sample_value = (
+        str(DEFAULT_SAMPLE_VIDEO)
+        if DEFAULT_SAMPLE_VIDEO.exists()
+        else (samples[0] if samples else None)
+    )
 
     with gr.Blocks(title="Imposter Demo") as demo:
         gr.Markdown("### Imposter Demo")
@@ -182,7 +178,7 @@ def build_demo() -> gr.Blocks:
         with gr.Row(visible=True) as sample_row:
             sample_dropdown = gr.Dropdown(
                 samples,
-                value=samples[0] if samples else None,
+                value=default_sample_value,
                 label="サンプル動画",
                 scale=4,
             )
@@ -220,22 +216,12 @@ def build_demo() -> gr.Blocks:
             yaw_slider = gr.Slider(0, 360, value=0, step=1, label="水平 (Yaw) 0–360°", interactive=True)
             pitch_slider = gr.Slider(MIN_PITCH, MAX_PITCH, value=10, step=1, label=f"垂直 (Pitch) {MIN_PITCH}°〜{MAX_PITCH}°", interactive=True)
 
-        frame_budget = gr.Slider(
-            minimum=2,
-            maximum=len(PRECOMPUTED_FRAMES),
-            value=min(120, len(PRECOMPUTED_FRAMES)),
-            step=max(1, len(PRECOMPUTED_FRAMES) // 30),
-            label="利用フレーム数（少ないほどカクつき）",
-            interactive=True,
-        )
-
-        info = gr.Textbox(label="ステータス", value="Ready", interactive=False)
-
         # 状態保持
         frames_state = gr.State(PRECOMPUTED_FRAMES)
         path_yaw_state = gr.State(PATH_YAW)
         path_pitch_state = gr.State(PATH_PITCH)
         size_state = gr.State(FRAME_SIZE)
+        frame_budget_state = gr.State(min(FRAME_BUDGET_DEFAULT, len(PRECOMPUTED_FRAMES)))
 
         # イベント: モード切替で表示を切り替える
         def toggle_mode(m):
@@ -253,7 +239,7 @@ def build_demo() -> gr.Blocks:
         sample_dropdown.change(
             switch_video,
             [sample_dropdown],
-            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget, image, info],
+            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget_state, image],
         )
 
         # 推論開始
@@ -267,24 +253,19 @@ def build_demo() -> gr.Blocks:
         infer_button.click(
             run_inference,
             [image_input],
-            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget, image, info],
+            [frames_state, path_yaw_state, path_pitch_state, size_state, frame_budget_state, image],
         ).then(hide_spinner, outputs=[spinner])
 
         # Live updates for sliders
         yaw_slider.input(
             update_view,
-            [yaw_slider, pitch_slider, frame_budget, frames_state, path_yaw_state, path_pitch_state],
-            [image, info],
+            [yaw_slider, pitch_slider, frame_budget_state, frames_state, path_yaw_state, path_pitch_state],
+            [image],
         )
         pitch_slider.input(
             update_view,
-            [yaw_slider, pitch_slider, frame_budget, frames_state, path_yaw_state, path_pitch_state],
-            [image, info],
-        )
-        frame_budget.change(
-            update_view,
-            [yaw_slider, pitch_slider, frame_budget, frames_state, path_yaw_state, path_pitch_state],
-            [image, info],
+            [yaw_slider, pitch_slider, frame_budget_state, frames_state, path_yaw_state, path_pitch_state],
+            [image],
         )
 
     return demo
