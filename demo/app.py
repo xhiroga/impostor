@@ -17,15 +17,18 @@ from utils.frame_picker import pick_frame_index
 from utils.video_loader import fallback_frames, load_video_frames
 from utils.inference import run_framepack_inference, load_inference_params
 
+# ディレクトリ関連の定数を一元管理
+DEMO_DIR = Path(__file__).resolve().parent
+DATA_ROOT = DEMO_DIR / "data"
+
 # 生成結果の保存先（ユーザ指定のデフォルト）
-DEMO_OUTPUT_DIR = Path("/workspace/imposter/demo/output")
+DEMO_OUTPUT_DIR = DEMO_DIR / "output"
 DEMO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # デフォルトで読み込むデータセット／サンプル動画
-DATASET_DIR = Path(__file__).resolve().parent / "data" / "dataset"
-SAMPLE_DIR = Path(__file__).resolve().parent / "data" / "inference-sample"
+DATASET_DIR = DATA_ROOT / "dataset"
 DEFAULT_DATASET_VIDEO = DATASET_DIR / "dataset_sample_leopard.mp4"
-DEFAULT_SAMPLE_VIDEO = SAMPLE_DIR / "inference_sample_girl.mp4"
+DEFAULT_SAMPLE_VIDEO = DEFAULT_DATASET_VIDEO
 # フレーム使用枚数（固定値にしたい場合ここを変更）
 FRAME_BUDGET_DEFAULT = 120
 
@@ -44,7 +47,9 @@ def scan_dataset_videos() -> list[str]:
 
 
 def scan_sample_videos() -> list[str]:
-    return _scan_videos(SAMPLE_DIR)
+    if DEFAULT_SAMPLE_VIDEO.exists():
+        return [str(DEFAULT_SAMPLE_VIDEO)]
+    return []
 
 
 def scan_output_videos() -> list[str]:
@@ -91,8 +96,6 @@ elif DATASET_DIR.exists() and list(DATASET_DIR.glob("**/*.mp4")):
     initial_video = sorted(DATASET_DIR.glob("**/*.mp4"))[0]
 elif DEFAULT_SAMPLE_VIDEO.exists():
     initial_video = DEFAULT_SAMPLE_VIDEO
-elif SAMPLE_DIR.exists() and list(SAMPLE_DIR.glob("**/*.mp4")):
-    initial_video = sorted(SAMPLE_DIR.glob("**/*.mp4"))[0]
 else:
     initial_video = VIDEO_PATH if VIDEO_PATH.exists() else None
 
