@@ -11,8 +11,6 @@ cd /workspace
 mkdir -p models
 mkdir -p tmp
 git clone https://huggingface.co/datasets/sawara-dev/imposter-data
-# 上手くいかないときは以下を試すと良い（password: HUGGINGFACE_TOKENを貼りつけ）
-# git clone https://${HUGGINGFACE_TOKEN}@huggingface.co/datasets/sawara-dev/imposter-data
 git clone https://huggingface.co/datasets/xhiroga/data
 git clone https://github.com/xhiroga/imposter
 cd imposter
@@ -23,10 +21,4 @@ zellij  # or tmux
 make models
 make cache
 make train
-```
-
-## Dependencey
-- `git-lfs`
-```sh
-sudo apt-get git-lfs
 ```

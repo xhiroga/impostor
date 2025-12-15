@@ -12,7 +12,3 @@ cache_directory = "/workspace/imposter/configs/v1/cache"
 resolution = [768, 768]
 num_repeats = 1 # optional, default is 1. Same as above.
 fp_latent_window_size = 9
-
-# defaultは129フレームで、動画が長くなった分、ここがうまくいってなかった可能性もある？
-# VRAM24GBで300フレームくらいいけるとチャットgptは言っている..
-max_frames = 500
