@@ -83,7 +83,6 @@ cache: .venv $(models)
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
 	TEXT_ENCODER1=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["text_encoder1"])')
 	TEXT_ENCODER2=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["text_encoder2"])')
-	LATENT_WINDOW_SIZE=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["latent_window_size"])')
 
 	uv run -m musubi_tuner.fpack_cache_latents \
 		--dataset_config $$DATASET_CONFIG \
@@ -106,7 +105,7 @@ cache: .venv $(models)
 
 models: $(models)
 $(models):
-	if uvx --from "huggingface_hub[cli]" hf auth whoami | grep -q 'Not logged in'; then uvx --from "huggingface_hub[cli]" hf auth login; fi
+	if uvx --from "huggingface_hub[cli]" hf auth whoami | grep -q 'Not logged in'; then uvx --from "huggingface_hub[cli]" hf auth login --token=$(HUGGINGFACE_TOKEN); fi
 	uvx --from "huggingface_hub[cli]" hf download $(REPO) $(FILE) --local-dir $(TMP)/$(REPO)
 	mkdir -p $(dir $@)
 	mv $(TMP)/$(REPO)/$(FILE) $@

@@ -14,6 +14,7 @@ git clone https://huggingface.co/datasets/sawara-dev/imposter-data
 git clone https://huggingface.co/datasets/xhiroga/data
 git clone https://github.com/xhiroga/imposter
 cd imposter
+uv venv
 uv pip install hatchling
 uv sync
 zellij  # or tmux
