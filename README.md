@@ -1,5 +1,11 @@
 # Imposter
 
+## Demo
+
+```sh
+uv run demo/app.py
+```
+
 ## Setup
 
 1. RunPodでVolumeをアタッチしたPodを起動する
