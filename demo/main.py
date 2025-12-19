@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -51,18 +50,8 @@ async def read_root():
                             お使いのブラウザは動画再生に対応していません。
                         </video>
                     </section>
-                    <button hx-get=\"/api/data\" hx-target=\"#result\" hx-swap=\"innerHTML\">
-                        データ取得
-                    </button>
-                    <div id=\"result\" style=\"margin-top: 1rem;\"></div>
                 </main>
             </body>
         </html>
         """
     )
-
-
-@app.get("/api/data", response_class=HTMLResponse)
-async def fetch_data():
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return f"<p>最新データ: {now}</p>"
