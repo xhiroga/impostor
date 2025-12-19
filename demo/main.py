@@ -10,12 +10,30 @@ APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
 
 
-def _resolve_default_video() -> str:
-    """data配下のmp4のうち最初の1本を返す。"""
+def _list_videos() -> list[Path]:
     videos = sorted(DATA_DIR.glob("*.mp4"))
     if not videos:
         raise HTTPException(status_code=500, detail="動画ファイルが見つかりません")
-    return videos[0].name
+    return videos
+
+
+def _resolve_video_name(video: str | None) -> str:
+    videos = _list_videos()
+    if video is None:
+        return videos[0].name
+    candidate = DATA_DIR / video
+    if candidate.exists() and candidate.suffix == ".mp4" and candidate.parent == DATA_DIR:
+        return candidate.name
+    raise HTTPException(status_code=404, detail="指定された動画が存在しません")
+
+
+def _render_video_html(video_name: str) -> str:
+    return (
+        "<video controls autoplay loop muted playsinline>"
+        f"<source src=\"/assets/{video_name}\" type=\"video/mp4\" />"
+        "お使いのブラウザは動画再生に対応していません。"
+        "</video>"
+    )
 
 
 app = FastAPI()
@@ -24,7 +42,13 @@ app.mount("/assets", StaticFiles(directory=DATA_DIR), name="assets")
 
 @app.get("/")
 async def read_root():
-    video_name = _resolve_default_video()
+    videos = _list_videos()
+    video_name = videos[0].name
+    select_options = "".join(
+        f"<option value=\"{video.name}\" {'selected' if video.name == video_name else ''}>{video.stem}</option>"
+        for video in videos
+    )
+    player_html = _render_video_html(video_name)
     return HTMLResponse(
         f"""
         <!DOCTYPE html>
@@ -44,14 +68,32 @@ async def read_root():
                 <main>
                     <h1>FastAPI × HTMX</h1>
                     <section class=\"panel\">
-                        <p>dataディレクトリのサンプル動画をそのまま再生しています。</p>
-                        <video controls autoplay loop muted playsinline>
-                            <source src=\"/assets/{video_name}\" type=\"video/mp4\" />
-                            お使いのブラウザは動画再生に対応していません。
-                        </video>
+                        <p>dataディレクトリのサンプル動画を選択できます。</p>
+                        <label style=\"display:block; margin-bottom:0.5rem;\">
+                            動画セレクタ
+                            <select
+                                name=\"video\"
+                                hx-get=\"/player\"
+                                hx-trigger=\"change\"
+                                hx-target=\"#player\"
+                                hx-swap=\"innerHTML\"
+                                style=\"margin-left:0.5rem; padding:0.25rem 0.5rem;\"
+                            >
+                                {select_options}
+                            </select>
+                        </label>
+                        <div id=\"player\">
+                            {player_html}
+                        </div>
                     </section>
                 </main>
             </body>
         </html>
         """
     )
+
+
+@app.get("/player", response_class=HTMLResponse)
+async def render_player(video: str | None = None):
+    video_name = _resolve_video_name(video)
+    return _render_video_html(video_name)
