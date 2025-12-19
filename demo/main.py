@@ -86,7 +86,7 @@ async def read_root():
                     const statusEl = document.getElementById('status');
                     const anglesEl = document.getElementById('angles');
 
-                    let renderer, scene, camera, controls, mesh, texture, textureCanvas, textureCtx;
+                    let renderer, scene, camera, controls, panelMesh, texture, textureCanvas, textureCtx;
                     let frameBitmaps = [];
                     let loading = false;
 
@@ -215,10 +215,17 @@ async def read_root():
                         light.position.set(5, 5, 5);
                         scene.add(light);
 
-                        const geometry = new THREE.BoxGeometry(1, 1.4, 0.2);
-                        const material = new THREE.MeshBasicMaterial({{ map: texture }});
-                        mesh = new THREE.Mesh(geometry, material);
-                        scene.add(mesh);
+                        const panelGeometry = new THREE.PlaneGeometry(1.6, 1.2);
+                        const panelMaterial = new THREE.MeshBasicMaterial({{ map: texture, side: THREE.DoubleSide }});
+                        panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+                        scene.add(panelMesh);
+
+                        const floorGeometry = new THREE.PlaneGeometry(4, 4);
+                        const floorMaterial = new THREE.MeshBasicMaterial({{ color: '#f0f0f0', side: THREE.DoubleSide }});
+                        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                        floor.rotation.x = -Math.PI / 2;
+                        floor.position.y = -1;
+                        scene.add(floor);
 
                         window.addEventListener('resize', () => onResize());
                     }}
@@ -239,7 +246,7 @@ async def read_root():
                     }}
 
                     function extractAngles() {{
-                        const offset = new THREE.Vector3().copy(camera.position).sub(mesh.position);
+                        const offset = new THREE.Vector3().copy(camera.position).sub(panelMesh.position);
                         const spherical = new THREE.Spherical().setFromVector3(offset);
                         const yaw = (THREE.MathUtils.radToDeg(spherical.theta) + 360) % 360;
                         const pitch = THREE.MathUtils.clamp(90 - THREE.MathUtils.radToDeg(spherical.phi), 0, 90);
@@ -266,6 +273,9 @@ async def read_root():
                     function animate() {{
                         requestAnimationFrame(animate);
                         if (controls) controls.update();
+                        if (panelMesh && camera) {{
+                            panelMesh.lookAt(camera.position);
+                        }}
                         if (renderer && scene && camera) {{
                             renderer.render(scene, camera);
                         }}
