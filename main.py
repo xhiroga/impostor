@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import asyncio
+import shutil
+from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -10,6 +13,7 @@ APP_DIR = Path(__file__).resolve().parent
 SAMPLE_DIR = APP_DIR / "sample"
 OUTPUT_DIR = APP_DIR / "output"
 ASSET_DIR = APP_DIR / "assets"
+TMP_DIR = APP_DIR / "tmp"
 
 
 VIDEO_SOURCES = (
@@ -35,6 +39,17 @@ def _list_videos() -> list[dict[str, str]]:
     return videos
 
 
+def _render_select_options(selected: str | None = None) -> tuple[str, str]:
+    entries = _list_videos()
+    values = {entry["value"] for entry in entries}
+    resolved = selected if selected in values else entries[0]["value"]
+    options_html = "".join(
+        f"<option value=\"{entry['value']}\" {'selected' if entry['value'] == resolved else ''}>{entry['label']}</option>"
+        for entry in entries
+    )
+    return resolved, options_html
+
+
 app = FastAPI()
 for mount_path, directory in (("/samples", SAMPLE_DIR), ("/output", OUTPUT_DIR), ("/assets", ASSET_DIR)):
     if directory.exists():
@@ -43,12 +58,7 @@ for mount_path, directory in (("/samples", SAMPLE_DIR), ("/output", OUTPUT_DIR),
 
 @app.get("/")
 async def read_root():
-    entries = _list_videos()
-    default_value = entries[0]["value"]
-    select_options = "".join(
-        f"<option value=\"{entry['value']}\" {'selected' if entry['value'] == default_value else ''}>{entry['label']}</option>"
-        for entry in entries
-    )
+    selected_value, select_options = _render_select_options()
     return HTMLResponse(
         f"""
         <!DOCTYPE html>
@@ -83,6 +93,15 @@ async def read_root():
                         <p id=\"status\">読み込み中...</p>
                         <p id=\"angles\"></p>
                     </section>
+                    <section class=\"panel\">
+                        <h2 style=\"margin-bottom:0.5rem;\">推論デモ</h2>
+                        <p>とりあえず5秒待ってから output ディレクトリに新しい動画をコピーします。</p>
+                        <form id=\"infer-form\" hx-post=\"/infer\" hx-target=\"#infer-status\" hx-swap=\"innerHTML\" hx-encoding=\"multipart/form-data\" hx-on::after-request=\"updateVideoSelect()\" style=\"display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;\">
+                            <input type=\"file\" name=\"image\" accept=\"image/*\" required style=\"flex:1 1 240px;\" />
+                            <button type=\"submit\" style=\"padding:0.5rem 1rem;\">推論スタート</button>
+                        </form>
+                        <div id=\"infer-status\" style=\"margin-top:0.5rem; color:#ccc;\"></div>
+                    </section>
                 </main>
                 <script type=\"module\">
                     import * as THREE from 'https://unpkg.com/three@0.169.0/build/three.module.js?module';
@@ -106,6 +125,22 @@ async def read_root():
                     let floorMesh;
                     let frameBitmaps = [];
                     let loading = false;
+
+                    document.body.addEventListener('video-select-updated', () => {{
+                        if (selectEl.value) {{
+                            loadVideo(selectEl.value);
+                        }}
+                    }});
+
+                    window.updateVideoSelect = (async function updateVideoSelect() {{
+                        const response = await fetch('/videos');
+                        if (!response.ok) return;
+                        const options = await response.text();
+                        selectEl.innerHTML = options;
+                        if (selectEl.value) {{
+                            document.body.dispatchEvent(new Event('video-select-updated'));
+                        }}
+                    }}).bind(window);
 
                     async function init() {{
                         await loadVideo(selectEl.value);
@@ -325,3 +360,41 @@ async def read_root():
         </html>
         """
     )
+
+
+@app.get("/videos", response_class=HTMLResponse)
+async def render_video_options(selected: str | None = None):
+    _, options_html = _render_select_options(selected)
+    return HTMLResponse(options_html)
+
+
+@app.post("/infer", response_class=HTMLResponse)
+async def run_inference(image: UploadFile = File(...)):
+    if not image.filename:
+        raise HTTPException(status_code=400, detail="画像ファイルを指定してください")
+
+    TMP_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    suffix = Path(image.filename).suffix or ".png"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    upload_path = TMP_DIR / f"upload_{timestamp}{suffix}"
+    upload_path.write_bytes(await image.read())
+
+    source_candidates = sorted(SAMPLE_DIR.glob("*.mp4"))
+    if not source_candidates:
+        raise HTTPException(status_code=500, detail="コピー元のサンプル動画がありません")
+    source_video = source_candidates[0]
+
+    await asyncio.sleep(5)
+
+    dest_name = f"infer_{timestamp}.mp4"
+    dest_path = OUTPUT_DIR / dest_name
+    shutil.copyfile(source_video, dest_path)
+
+    status_html = (
+        f"<p>推論完了: output/{dest_name} を再生リストに追加しました。</p>"
+        f"<p style=\"font-size:0.9rem;color:#aaa;\">入力画像は {upload_path.name} として一時保存されています。</p>"
+    )
+    reloader = "<script>if (window.updateVideoSelect) { updateVideoSelect(); }</script>"
+    return HTMLResponse(status_html + reloader)
