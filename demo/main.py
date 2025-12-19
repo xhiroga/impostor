@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
-TEXTURE_DIR = APP_DIR / "assets"
+ASSETS_DIR = APP_DIR / "assets"
 
 
 def _list_videos() -> list[Path]:
@@ -19,9 +19,7 @@ def _list_videos() -> list[Path]:
 
 
 app = FastAPI()
-app.mount("/assets", StaticFiles(directory=DATA_DIR), name="assets")
-if TEXTURE_DIR.exists():
-    app.mount("/textures", StaticFiles(directory=TEXTURE_DIR), name="textures")
+app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
 
 @app.get("/")
@@ -294,7 +292,7 @@ async def read_root():
                     function applyFloorTextures() {{
                         if (!floorMesh) return;
                         const loader = new THREE.TextureLoader();
-                        const ground = loader.load('/textures/green-grass.png');
+                        const ground = loader.load('/assets/green-grass.png');
                         ground.wrapS = THREE.MirroredRepeatWrapping;
                         ground.wrapT = THREE.MirroredRepeatWrapping;
                         ground.repeat.set(1.5, 1.5);
