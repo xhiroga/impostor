@@ -7,19 +7,21 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 APP_DIR = Path(__file__).resolve().parent
-DATA_DIR = APP_DIR / "data"
-ASSETS_DIR = APP_DIR / "assets"
+SAMPLE_DIR = APP_DIR / "sample"
+ASSET_DIR = APP_DIR / "assets"
 
 
 def _list_videos() -> list[Path]:
-    videos = sorted(DATA_DIR.glob("*.mp4"))
+    videos = sorted(SAMPLE_DIR.glob("*.mp4"))
     if not videos:
         raise HTTPException(status_code=500, detail="動画ファイルが見つかりません")
     return videos
 
 
 app = FastAPI()
-app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+for mount_path, directory in (("/samples", SAMPLE_DIR), ("/assets", ASSET_DIR)):
+    if directory.exists():
+        app.mount(mount_path, StaticFiles(directory=directory), name=mount_path.strip("/"))
 
 
 @app.get("/")
@@ -113,7 +115,7 @@ async def read_root():
                         try {{
                             await cleanupFrames();
                             const video = document.createElement('video');
-                            video.src = `/assets/${{videoName}}`;
+                            video.src = `/samples/${{videoName}}`;
                             video.crossOrigin = 'anonymous';
                             video.muted = true;
                             video.playsInline = true;

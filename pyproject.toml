@@ -15,6 +15,7 @@ dependencies = [
     "musubi-tuner[cu128]",
     "hf-transfer>=0.1.9",
     "sageattention>=1.0.6",
+    "fastapi[standard]>=0.125.0",
 ]
 
 [tool.uv]
@@ -27,8 +28,3 @@ sageattention = ["torch"]
 
 [tool.uv.sources]
 musubi-tuner = { git = "https://github.com/kohya-ss/musubi-tuner" }
-
-[tool.uv.workspace]
-members = [
-    "demo",
-]

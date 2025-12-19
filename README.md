@@ -3,7 +3,6 @@
 ## Demo
 
 ```sh
-cd demo
 uv run fastapi dev main.py
 ```
 
