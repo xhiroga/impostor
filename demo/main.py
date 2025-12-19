@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
+TEXTURE_DIR = APP_DIR / "assets"
 
 
 def _list_videos() -> list[Path]:
@@ -19,6 +20,8 @@ def _list_videos() -> list[Path]:
 
 app = FastAPI()
 app.mount("/assets", StaticFiles(directory=DATA_DIR), name="assets")
+if TEXTURE_DIR.exists():
+    app.mount("/textures", StaticFiles(directory=TEXTURE_DIR), name="textures")
 
 
 @app.get("/")
@@ -87,6 +90,7 @@ async def read_root():
                     const anglesEl = document.getElementById('angles');
 
                     let renderer, scene, camera, controls, panelMesh, texture, textureCanvas, textureCtx;
+                    let floorMesh;
                     let frameBitmaps = [];
                     let loading = false;
 
@@ -194,10 +198,11 @@ async def read_root():
                         renderer = new THREE.WebGLRenderer({{ antialias: true }});
                         renderer.setPixelRatio(window.devicePixelRatio);
                         renderer.setSize(viewerEl.clientWidth, viewerEl.clientHeight);
+                        renderer.outputColorSpace = THREE.SRGBColorSpace;
                         viewerEl.appendChild(renderer.domElement);
 
                         scene = new THREE.Scene();
-                        scene.background = new THREE.Color('#ffffff');
+                        scene.background = new THREE.Color('#f5f1e7');
 
                         camera = new THREE.PerspectiveCamera(45, viewerEl.clientWidth / viewerEl.clientHeight, 0.1, 100);
                         camera.position.set(0, 0, 3);
@@ -211,21 +216,25 @@ async def read_root():
                         controls.maxPolarAngle = THREE.MathUtils.degToRad(90);
                         controls.addEventListener('change', handleCameraMove);
 
-                        const light = new THREE.DirectionalLight(0xffffff, 1);
-                        light.position.set(5, 5, 5);
+                        const light = new THREE.DirectionalLight(0xfff3d4, 1.2);
+                        light.position.set(5, 6, 4);
                         scene.add(light);
+                        const ambient = new THREE.HemisphereLight(0xf9f5df, 0x5b4d2b, 0.6);
+                        scene.add(ambient);
 
-                        const panelGeometry = new THREE.PlaneGeometry(1.6, 1.2);
+                        const panelGeometry = new THREE.PlaneGeometry(1.2, 1.2);
                         const panelMaterial = new THREE.MeshBasicMaterial({{ map: texture, side: THREE.DoubleSide }});
                         panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+                        panelMesh.position.y = -0.4;
                         scene.add(panelMesh);
 
-                        const floorGeometry = new THREE.PlaneGeometry(4, 4);
-                        const floorMaterial = new THREE.MeshBasicMaterial({{ color: '#f0f0f0', side: THREE.DoubleSide }});
-                        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-                        floor.rotation.x = -Math.PI / 2;
-                        floor.position.y = -1;
-                        scene.add(floor);
+                        const floorGeometry = new THREE.PlaneGeometry(6, 6);
+                        const floorMaterial = new THREE.MeshStandardMaterial({{ color: '#ffffff', metalness: 0.05, roughness: 0.9 }});
+                        floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+                        floorMesh.rotation.x = -Math.PI / 2;
+                        floorMesh.position.y = -1;
+                        scene.add(floorMesh);
+                        applyFloorTextures();
 
                         window.addEventListener('resize', () => onResize());
                     }}
@@ -255,7 +264,8 @@ async def read_root():
 
                     function mapAnglesToFrame(yaw, pitch) {{
                         const yawStep = 360 / 16;
-                        const yawIndex = Math.floor(((yaw % 360) + yawStep / 2) / yawStep) % 16;
+                        const yawReversed = (360 - yaw) % 360;
+                        const yawIndex = Math.floor(((yawReversed % 360) + yawStep / 2) / yawStep) % 16;
                         const band = PITCH_BANDS.find((segment) => pitch >= segment.min && pitch < segment.max) ?? PITCH_BANDS[PITCH_BANDS.length - 1];
                         let idx = band.offset + yawIndex;
                         return Math.min(idx, FRAME_COUNT - 1);
@@ -279,6 +289,21 @@ async def read_root():
                         if (renderer && scene && camera) {{
                             renderer.render(scene, camera);
                         }}
+                    }}
+
+                    function applyFloorTextures() {{
+                        if (!floorMesh) return;
+                        const loader = new THREE.TextureLoader();
+                        const ground = loader.load('/textures/green-grass.png');
+                        ground.wrapS = THREE.MirroredRepeatWrapping;
+                        ground.wrapT = THREE.MirroredRepeatWrapping;
+                        ground.repeat.set(1.5, 1.5);
+                        ground.colorSpace = THREE.SRGBColorSpace;
+                        floorMesh.material.map = ground;
+                        floorMesh.material.normalMap = null;
+                        floorMesh.material.roughnessMap = null;
+                        floorMesh.material.roughness = 0.9;
+                        floorMesh.material.needsUpdate = true;
                     }}
 
                     init();
