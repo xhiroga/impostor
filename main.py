@@ -8,33 +8,46 @@ from fastapi.staticfiles import StaticFiles
 
 APP_DIR = Path(__file__).resolve().parent
 SAMPLE_DIR = APP_DIR / "sample"
+OUTPUT_DIR = APP_DIR / "output"
 ASSET_DIR = APP_DIR / "assets"
 
 
-def _list_videos() -> list[Path]:
-    videos = sorted(SAMPLE_DIR.glob("*.mp4"))
+VIDEO_SOURCES = (
+    ("samples", SAMPLE_DIR),
+    ("output", OUTPUT_DIR),
+)
+
+
+def _list_videos() -> list[dict[str, str]]:
+    videos: list[dict[str, str]] = []
+    for mount_name, directory in VIDEO_SOURCES:
+        if not directory.exists():
+            continue
+        for video in sorted(directory.glob("*.mp4")):
+            videos.append(
+                {
+                    "value": f"{mount_name}/{video.name}",
+                    "label": f"{mount_name} · {video.stem}",
+                }
+            )
     if not videos:
         raise HTTPException(status_code=500, detail="動画ファイルが見つかりません")
     return videos
 
 
 app = FastAPI()
-for mount_path, directory in (("/samples", SAMPLE_DIR), ("/assets", ASSET_DIR)):
+for mount_path, directory in (("/samples", SAMPLE_DIR), ("/output", OUTPUT_DIR), ("/assets", ASSET_DIR)):
     if directory.exists():
         app.mount(mount_path, StaticFiles(directory=directory), name=mount_path.strip("/"))
 
 
 @app.get("/")
 async def read_root():
-    videos = _list_videos()
-    video_name = videos[0].name
-    options = [
-        {"value": video.name, "label": video.stem, "selected": video.name == video_name}
-        for video in videos
-    ]
+    entries = _list_videos()
+    default_value = entries[0]["value"]
     select_options = "".join(
-        f"<option value=\"{opt['value']}\" {'selected' if opt['selected'] else ''}>{opt['label']}</option>"
-        for opt in options
+        f"<option value=\"{entry['value']}\" {'selected' if entry['value'] == default_value else ''}>{entry['label']}</option>"
+        for entry in entries
     )
     return HTMLResponse(
         f"""
@@ -108,14 +121,14 @@ async def read_root():
                         statusEl.textContent = text;
                     }}
 
-                    async function loadVideo(videoName) {{
-                        if (!videoName || loading) return;
+                    async function loadVideo(videoPath) {{
+                        if (!videoPath || loading) return;
                         loading = true;
-                        updateStatus(`Loading ${{videoName}} ...`);
+                        updateStatus(`Loading ${{videoPath}} ...`);
                         try {{
                             await cleanupFrames();
                             const video = document.createElement('video');
-                            video.src = `/samples/${{videoName}}`;
+                            video.src = `/${{videoPath}}`;
                             video.crossOrigin = 'anonymous';
                             video.muted = true;
                             video.playsInline = true;
@@ -150,7 +163,7 @@ async def read_root():
                             }}
 
                             updateTexture(0);
-                            updateStatus(`Loaded ${{videoName}}`);
+                            updateStatus(`Loaded ${{videoPath}}`);
                         }} catch (error) {{
                             console.error('Failed to load video frames', error);
                             updateStatus('フレーム抽出に失敗しました');
@@ -202,7 +215,7 @@ async def read_root():
                         viewerEl.appendChild(renderer.domElement);
 
                         scene = new THREE.Scene();
-                        scene.background = new THREE.Color('#f5f1e7');
+                        scene.background = new THREE.Color('#ffffff');
 
                         camera = new THREE.PerspectiveCamera(45, viewerEl.clientWidth / viewerEl.clientHeight, 0.1, 100);
                         camera.position.set(0, 0, 3);
