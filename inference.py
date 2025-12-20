@@ -4,7 +4,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 from uuid import uuid4
 
 import torch
@@ -106,7 +106,7 @@ class FramePackInference:
         self.settings = settings
 
     @classmethod
-    def from_env(cls) -> FramePackInference:
+    def from_env(cls) -> Self:
         def _require_env(key: str) -> str:
             value = os.getenv(key)
             if not value:
@@ -154,7 +154,6 @@ class FramePackInference:
         return output_path
 
     def _run_framepack(self, image_bytes: bytes) -> torch.Tensor:
-        model_paths = self.model_paths
         video = generate_video(
             model_paths=asdict(self.model_paths),
             prompt=self.settings.prompt,

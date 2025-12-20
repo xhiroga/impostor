@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -103,7 +104,7 @@ async def render_video_options(selected: str | None = Query(default=None)):
 
 
 @app.post("/infer", response_class=HTMLResponse)
-async def run_inference(image: UploadFile = File(...)):
+async def run_inference(image: Annotated[UploadFile, File(...)]):
     if INFER_ENGINE is None:
         raise HTTPException(
             status_code=503,
