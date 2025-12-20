@@ -16,6 +16,7 @@ dependencies = [
     "hf-transfer>=0.1.9",
     "sageattention>=1.0.6",
     "fastapi[standard]>=0.125.0",
+    "python-dotenv~=1.0.0",
 ]
 
 [tool.uv]
