@@ -209,16 +209,33 @@ async def read_root():
                             await waitEvent(video, 'loadedmetadata');
 
                             const captureCanvas = document.createElement('canvas');
-                            captureCanvas.width = video.videoWidth;
-                            captureCanvas.height = video.videoHeight;
+                            const normalizedSize = Math.max(video.videoWidth, video.videoHeight);
+                            captureCanvas.width = normalizedSize;
+                            captureCanvas.height = normalizedSize;
                             const captureCtx = captureCanvas.getContext('2d');
+                            captureCtx.imageSmoothingEnabled = true;
+                            captureCtx.imageSmoothingQuality = 'high';
+                            captureCtx.fillStyle = '#ffffff';
                             const duration = video.duration;
                             const maxTime = duration - 0.0001;
                             const frameTimes = Array.from({{ length: FRAME_COUNT }}, (_, i) => Math.min((i / (FRAME_COUNT - 1)) * duration, maxTime));
                             frameBitmaps = [];
                             for (const time of frameTimes) {{
                                 await seekVideo(video, time);
-                                captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+                                const offsetX = (normalizedSize - video.videoWidth) / 2;
+                                const offsetY = (normalizedSize - video.videoHeight) / 2;
+                                captureCtx.fillRect(0, 0, normalizedSize, normalizedSize);
+                                captureCtx.drawImage(
+                                    video,
+                                    0,
+                                    0,
+                                    video.videoWidth,
+                                    video.videoHeight,
+                                    offsetX,
+                                    offsetY,
+                                    video.videoWidth,
+                                    video.videoHeight,
+                                );
                                 const bitmap = await createImageBitmap(captureCanvas);
                                 frameBitmaps.push(bitmap);
                             }}
