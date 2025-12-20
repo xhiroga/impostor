@@ -6,9 +6,9 @@ enable_bucket = true
 bucket_no_upscale = false
 
 [[datasets]]
-video_jsonl_file = "/workspace/imposter/configs/v3/metadata_81f.jsonl"
+video_jsonl_file = "/workspace/impostor/configs/v3/metadata_81f.jsonl"
 frame_extraction = "full"
-cache_directory = "/workspace/imposter/configs/v3/cache"
+cache_directory = "/workspace/impostor/configs/v3/cache"
 resolution = [768, 768]
 num_repeats = 1 # optional, default is 1. Same as above.
 # fp_latent_window_size = 9

@@ -677,7 +677,7 @@ wheels = [
 ]
 
 [[package]]
-name = "imposter"
+name = "impostor"
 version = "0.2.0"
 source = { virtual = "." }
 dependencies = [
