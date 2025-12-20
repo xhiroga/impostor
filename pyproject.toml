@@ -20,6 +20,12 @@ dependencies = [
     "jinja2>=3.1.6",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff>=0.14.10",
+    "ty>=0.0.4",
+]
+
 [tool.uv]
 link-mode = "copy"
 no-build-isolation = true
@@ -30,3 +36,15 @@ sageattention = ["torch"]
 
 [tool.uv.sources]
 musubi-tuner = { git = "https://github.com/kohya-ss/musubi-tuner" }
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "A", "C4", "UP", "SIM", "RUF"]
+ignore = ["E501"]  # Line too long (handled by formatter)
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

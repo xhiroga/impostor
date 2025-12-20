@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import io
 import os
 import tempfile
@@ -10,8 +8,8 @@ from typing import Any
 from uuid import uuid4
 
 import torch
-from PIL import Image
 import torchvision
+from PIL import Image
 
 
 class InferenceError(Exception):
@@ -108,7 +106,7 @@ class FramePackInference:
         self.settings = settings
 
     @classmethod
-    def from_env(cls) -> "FramePackInference":
+    def from_env(cls) -> FramePackInference:
         def _require_env(key: str) -> str:
             value = os.getenv(key)
             if not value:
@@ -148,7 +146,9 @@ class FramePackInference:
             image_bytes, resolution=self.settings.bucket_resolution
         )
         video_tensor = self._run_framepack(resized_bytes)
-        filename = f"infer_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}.mp4"
+        filename = (
+            f"infer_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}.mp4"
+        )
         output_path = self.settings.output_dir / filename
         save_video_tensor(video_tensor, output_path, fps=self.settings.fps)
         return output_path
@@ -274,7 +274,9 @@ def generate_video(
 
     tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(dir=cache_root, suffix=".png", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(
+            dir=cache_root, suffix=".png", delete=False
+        ) as tmp:
             tmp.write(image_bytes)
             image_path = tmp.name
             tmp_path = Path(image_path)
@@ -305,7 +307,9 @@ def generate_video(
         if vae is None:
             raise InferenceError("VAE was None after generation")
 
-        total_latent_sections = (args.video_seconds * 30) / (args.latent_window_size * 4)
+        total_latent_sections = (args.video_seconds * 30) / (
+            args.latent_window_size * 4
+        )
         total_latent_sections = int(max(round(total_latent_sections), 1))
         device = torch.device("cuda")
 
