@@ -1,15 +1,13 @@
 import asyncio
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from inference import FramePackInference, InferenceError
 
@@ -23,6 +21,7 @@ SAMPLE_DIR = APP_DIR / "sample"
 OUTPUT_DIR = APP_DIR / "output"
 ASSET_DIR = APP_DIR / "assets"
 TMP_DIR = APP_DIR / "tmp"
+FRONTEND_BUILD_DIR = APP_DIR / "frontend" / "build"
 
 INFER_ENGINE: FramePackInference | None = None
 INFER_ENGINE_ERROR: str | None = None
@@ -58,17 +57,6 @@ def _list_videos() -> list[dict[str, str]]:
     return videos
 
 
-def _render_select_options(selected: str | None = None) -> tuple[str, str]:
-    entries = _list_videos()
-    values = {entry["value"] for entry in entries}
-    resolved = selected if selected in values else entries[0]["value"]
-    options_html = "".join(
-        f'<option value="{entry["value"]}" {"selected" if entry["value"] == resolved else ""}>{entry["label"]}</option>'
-        for entry in entries
-    )
-    return resolved, options_html
-
-
 app = FastAPI()
 for mount_path, directory in (
     ("/samples", SAMPLE_DIR),
@@ -80,30 +68,20 @@ for mount_path, directory in (
             mount_path, StaticFiles(directory=directory), name=mount_path.strip("/")
         )
 
-templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
+@app.get("/api/videos")
+async def list_videos():
+    return _list_videos()
 
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    _, select_options = _render_select_options()
-    return templates.TemplateResponse(
-        "index.html.j2",
-        {
-            "request": request,
-            "select_options": select_options,
-            "infer_disabled": INFER_ENGINE is None,
-            "infer_error": INFER_ENGINE_ERROR,
-        },
-    )
+@app.get("/api/status")
+async def app_status():
+    return {
+        "infer_ready": INFER_ENGINE is not None,
+        "infer_error": INFER_ENGINE_ERROR,
+    }
 
 
-@app.get("/videos", response_class=HTMLResponse)
-async def render_video_options(selected: str | None = Query(default=None)):
-    _, options_html = _render_select_options(selected)
-    return HTMLResponse(options_html)
-
-
-@app.post("/infer", response_class=HTMLResponse)
+@app.post("/api/infer")
 async def run_inference(image: Annotated[UploadFile, File(...)]):
     if INFER_ENGINE is None:
         raise HTTPException(
@@ -141,10 +119,23 @@ async def run_inference(image: Annotated[UploadFile, File(...)]):
     if not video_path.is_relative_to(OUTPUT_DIR):
         raise HTTPException(status_code=500, detail="推論結果の保存先が不正です")
     relative_value = f"output/{video_path.relative_to(OUTPUT_DIR)}"
+    label = f"output · {video_path.stem}"
 
-    status_html = (
-        f"<p>推論完了: {video_path.name} を output に追加しました。</p>"
-        f'<p style="font-size:0.9rem;color:#aaa;">入力画像は {upload_path.name} として保存されています。</p>'
+    return {
+        "message": f"推論完了: {video_path.name} を output に追加しました。",
+        "video": {"value": relative_value, "label": label},
+        "upload_filename": upload_path.name,
+    }
+
+
+if FRONTEND_BUILD_DIR.exists():
+    app.mount(
+        "/",
+        StaticFiles(directory=FRONTEND_BUILD_DIR, html=True),
+        name="frontend",
     )
-    script = f"<script>window.__latestVideo = {json.dumps(relative_value)};</script>"
-    return HTMLResponse(status_html + script)
+else:
+
+    @app.get("/", response_class=HTMLResponse)
+    async def frontend_placeholder():
+        return HTMLResponse("<h1>Frontend build not found. Run npm run build in frontend/.</h1>")

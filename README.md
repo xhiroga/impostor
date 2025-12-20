@@ -3,7 +3,7 @@
 ## Demo
 
 ```sh
-uv run fastapi dev main.py
+make demo
 ```
 
 ## Setup

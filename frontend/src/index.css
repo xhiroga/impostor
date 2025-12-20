@@ -1,0 +1,13 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg, #f5f7fb);
+  color: var(--fg, #1f2933);
+}
+
+a {
+  color: inherit;
+}
