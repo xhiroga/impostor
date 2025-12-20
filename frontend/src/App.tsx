@@ -123,14 +123,14 @@ function App() {
       <header className="app-head">
         <p className="eyebrow">FastAPI × React</p>
         <h1>Impostor Maker</h1>
-        <p className="lead">ドラッグでカメラを動かしつつ、推論で生成した 360° フレームを切り替えてキューブに貼り付けよう。</p>
+        <p className="lead">単一の画像から軽量な偽の3Dモデルを生成します。裏側で動画生成モデルを使用。</p>
       </header>
       <main className="layout">
         <section className="panel">
           <div className="panel-head">
             <p className="eyebrow">Upload</p>
             <h2>入力画像をアップロード</h2>
-            <p className="muted">768x768 にリサイズして推論に回します。完了すると最新の動画が自動でプレビューに反映されます。</p>
+            <p className="muted">768x768 にリサイズして推論します。</p>
           </div>
           <form className="infer-form" onSubmit={handleSubmit}>
             <input
