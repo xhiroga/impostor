@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <title>FastAPI + HTMX Demo</title>
+        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+        <style>
+            body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #111; color: #f7f7f7; }
+            main { max-width: 960px; margin: 0 auto; }
+            video { width: 100%; height: auto; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,0.4); }
+            .panel { margin-bottom: 1.5rem; }
+            #viewer { width: 100%; aspect-ratio: 16 / 9; background: #fff; border-radius: 16px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1); position: relative; }
+            #viewer canvas { width: 100%; height: 100%; display: block; border-radius: 16px; }
+            #status { margin-top: 0.5rem; font-size: 0.9rem; color: #ccc; }
+            #angles { margin-top: 0.25rem; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.9rem; color: #bbb; }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>FastAPI × HTMX</h1>
+            <section class="panel">
+                <p>ドラッグでカメラを動かすと、角度に応じて81フレームのどれかを自動選択し、キューブに貼り付けます。</p>
+                <label style="display:block; margin-bottom:0.75rem;">
+                    動画セレクタ
+                    <select id="video-select" style="margin-left:0.5rem; padding:0.25rem 0.5rem;">
+                        {{ select_options | safe }}
+                    </select>
+                </label>
+                <div id="viewer"></div>
+                <p id="status">読み込み中...</p>
+                <p id="angles"></p>
+            </section>
+            <section class="panel">
+                <h2 style="margin-bottom:0.5rem;">推論デモ</h2>
+                <p>ImposterのFramePack推論を実行し、生成結果を output ディレクトリに保存します。</p>
+                <form id="infer-form" hx-post="/infer" hx-target="#infer-status" hx-swap="innerHTML" hx-encoding="multipart/form-data" hx-on::after-request="window.updateVideoSelect && window.updateVideoSelect()" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="image" accept="image/*" required {{ 'disabled' if infer_disabled else '' }} style="flex:1 1 240px;" />
+                    <button type="submit" style="padding:0.5rem 1rem;" {{ 'disabled' if infer_disabled else '' }}>推論スタート</button>
+                </form>
+                <div id="infer-status" style="margin-top:0.5rem; color:#ccc;"></div>
+                {% if infer_error %}
+                <p style="color:#f88;margin-top:0.5rem;">{{ infer_error }}</p>
+                {% endif %}
+            </section>
+        </main>
+        {% raw %}
+        <script type="module">
+            import * as THREE from 'https://unpkg.com/three@0.169.0/build/three.module.js?module';
+            import { OrbitControls } from 'https://unpkg.com/three@0.169.0/examples/jsm/controls/OrbitControls.js?module';
+
+            const FRAME_COUNT = 81;
+            const PITCH_BANDS = [
+                { min: 0, max: 18, offset: 0 },
+                { min: 18, max: 36, offset: 16 },
+                { min: 36, max: 54, offset: 32 },
+                { min: 54, max: 72, offset: 48 },
+                { min: 72, max: 91, offset: 64 },
+            ];
+
+            const viewerEl = document.getElementById('viewer');
+            const selectEl = document.getElementById('video-select');
+            const statusEl = document.getElementById('status');
+            const anglesEl = document.getElementById('angles');
+
+            let renderer, scene, camera, controls, panelMesh, texture, textureCanvas, textureCtx;
+            let floorMesh;
+            let frameBitmaps = [];
+            let loading = false;
+
+            window.__latestVideo = window.__latestVideo ?? null;
+
+            document.body.addEventListener('video-select-updated', () => {
+                if (selectEl.value) {
+                    loadVideo(selectEl.value);
+                }
+            });
+
+            window.updateVideoSelect = async function updateVideoSelect() {
+                const preferred = window.__latestVideo || selectEl.value || '';
+                const query = preferred ? `?selected=${encodeURIComponent(preferred)}` : '';
+                try {
+                    const response = await fetch(`/videos${query}`);
+                    if (!response.ok) return;
+                    const options = await response.text();
+                    selectEl.innerHTML = options;
+                    if (preferred) {
+                        selectEl.value = preferred;
+                        window.__latestVideo = null;
+                    }
+                    if (selectEl.value) {
+                        document.body.dispatchEvent(new Event('video-select-updated'));
+                    }
+                } catch (error) {
+                    console.error('Failed to refresh videos', error);
+                }
+            };
+
+            async function init() {
+                await loadVideo(selectEl.value);
+                initThree();
+                animate();
+            }
+
+            selectEl.addEventListener('change', async () => {
+                await loadVideo(selectEl.value);
+            });
+
+            function updateStatus(text) {
+                statusEl.textContent = text;
+            }
+
+            async function loadVideo(videoPath) {
+                if (!videoPath || loading) return;
+                loading = true;
+                updateStatus(`Loading ${videoPath} ...`);
+                try {
+                    await cleanupFrames();
+                    const video = document.createElement('video');
+                    video.src = `/${videoPath}`;
+                    video.crossOrigin = 'anonymous';
+                    video.muted = true;
+                    video.playsInline = true;
+                    video.preload = 'auto';
+                    await waitEvent(video, 'loadedmetadata');
+
+                    const captureCanvas = document.createElement('canvas');
+                    const normalizedSize = Math.max(video.videoWidth, video.videoHeight);
+                    captureCanvas.width = normalizedSize;
+                    captureCanvas.height = normalizedSize;
+                    const captureCtx = captureCanvas.getContext('2d');
+                    captureCtx.imageSmoothingEnabled = true;
+                    captureCtx.imageSmoothingQuality = 'high';
+                    captureCtx.fillStyle = '#ffffff';
+                    const duration = video.duration;
+                    const maxTime = duration - 0.0001;
+                    const frameTimes = Array.from({ length: FRAME_COUNT }, (_, i) => Math.min((i / (FRAME_COUNT - 1)) * duration, maxTime));
+                    frameBitmaps = [];
+                    for (const time of frameTimes) {
+                        await seekVideo(video, time);
+                        const offsetX = (normalizedSize - video.videoWidth) / 2;
+                        const offsetY = (normalizedSize - video.videoHeight) / 2;
+                        captureCtx.fillRect(0, 0, normalizedSize, normalizedSize);
+                        captureCtx.drawImage(
+                            video,
+                            0,
+                            0,
+                            video.videoWidth,
+                            video.videoHeight,
+                            offsetX,
+                            offsetY,
+                            video.videoWidth,
+                            video.videoHeight,
+                        );
+                        const bitmap = await createImageBitmap(captureCanvas);
+                        frameBitmaps.push(bitmap);
+                    }
+
+                    if (!textureCanvas) {
+                        textureCanvas = document.createElement('canvas');
+                        textureCanvas.width = captureCanvas.width;
+                        textureCanvas.height = captureCanvas.height;
+                        textureCtx = textureCanvas.getContext('2d');
+                        texture = new THREE.CanvasTexture(textureCanvas);
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                    } else {
+                        textureCanvas.width = captureCanvas.width;
+                        textureCanvas.height = captureCanvas.height;
+                    }
+
+                    updateTexture(0);
+                    updateStatus(`Loaded ${videoPath}`);
+                } catch (error) {
+                    console.error('Failed to load video frames', error);
+                    updateStatus('フレーム抽出に失敗しました');
+                } finally {
+                    loading = false;
+                }
+            }
+
+            async function cleanupFrames() {
+                if (!frameBitmaps.length) return;
+                for (const bitmap of frameBitmaps) {
+                    if (bitmap.close) bitmap.close();
+                }
+                frameBitmaps = [];
+            }
+
+            function waitEvent(target, name) {
+                return new Promise((resolve, reject) => {
+                    const onError = (err) => {
+                        target.removeEventListener('error', onError);
+                        reject(err);
+                    };
+                    target.addEventListener(name, function handler(event) {
+                        target.removeEventListener(name, handler);
+                        target.removeEventListener('error', onError);
+                        resolve(event);
+                    });
+                    target.addEventListener('error', onError);
+                });
+            }
+
+            function seekVideo(video, time) {
+                return new Promise((resolve) => {
+                    const onSeeked = () => {
+                        video.removeEventListener('seeked', onSeeked);
+                        resolve();
+                    };
+                    video.addEventListener('seeked', onSeeked);
+                    video.currentTime = time;
+                });
+            }
+
+            function initThree() {
+                const width = viewerEl.clientWidth;
+                const height = viewerEl.clientHeight;
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                viewerEl.appendChild(renderer.domElement);
+
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color('#ffffff');
+
+                camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+                camera.position.set(0, 1, 2.4);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.enablePan = false;
+                controls.minDistance = 1.4;
+                controls.maxDistance = 5;
+                controls.minPolarAngle = THREE.MathUtils.degToRad(0.0001);
+                controls.maxPolarAngle = THREE.MathUtils.degToRad(90);
+                controls.addEventListener('change', handleCameraMove);
+
+                const light = new THREE.DirectionalLight(0xfff3d4, 1.2);
+                light.position.set(5, 6, 4);
+                scene.add(light);
+                const ambient = new THREE.HemisphereLight(0xf9f5df, 0x5b4d2b, 0.6);
+                scene.add(ambient);
+
+                const panelGeometry = new THREE.PlaneGeometry(1.2, 1.2);
+                const panelMaterial = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+                panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+                panelMesh.position.y = -0.4;
+                scene.add(panelMesh);
+
+                const floorGeometry = new THREE.PlaneGeometry(6, 6);
+                const floorMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.05, roughness: 0.9 });
+                floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+                floorMesh.rotation.x = -Math.PI / 2;
+                floorMesh.position.y = -1;
+                scene.add(floorMesh);
+                applyFloorTextures();
+
+                window.addEventListener('resize', () => onResize());
+            }
+
+            function updateTexture(index) {
+                if (!textureCtx || !frameBitmaps.length) return;
+                const frame = frameBitmaps[Math.min(index, frameBitmaps.length - 1)];
+                textureCtx.drawImage(frame, 0, 0, textureCanvas.width, textureCanvas.height);
+                texture.needsUpdate = true;
+            }
+
+            function handleCameraMove() {
+                if (!frameBitmaps.length) return;
+                const { yaw, pitch } = extractAngles();
+                const frameIndex = mapAnglesToFrame(yaw, pitch);
+                updateTexture(frameIndex);
+                anglesEl.textContent = `Yaw ${yaw.toFixed(1)}° / Pitch ${pitch.toFixed(1)}° / Frame ${frameIndex}`;
+            }
+
+            function extractAngles() {
+                const offset = new THREE.Vector3().copy(camera.position).sub(panelMesh.position);
+                const spherical = new THREE.Spherical().setFromVector3(offset);
+                const yaw = (THREE.MathUtils.radToDeg(spherical.theta) + 360) % 360;
+                const pitch = THREE.MathUtils.clamp(90 - THREE.MathUtils.radToDeg(spherical.phi), 0, 90);
+                return { yaw, pitch };
+            }
+
+            function mapAnglesToFrame(yaw, pitch) {
+                const yawStep = 360 / 16;
+                const yawReversed = (360 - yaw) % 360;
+                const yawIndex = Math.floor(((yawReversed % 360) + yawStep / 2) / yawStep) % 16;
+                const band = PITCH_BANDS.find((segment) => pitch >= segment.min && pitch < segment.max) ?? PITCH_BANDS[PITCH_BANDS.length - 1];
+                let idx = band.offset + yawIndex;
+                return Math.min(idx, FRAME_COUNT - 1);
+            }
+
+            function onResize() {
+                if (!renderer || !camera) return;
+                const width = viewerEl.clientWidth;
+                const height = viewerEl.clientHeight;
+                renderer.setSize(width, height);
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                if (controls) controls.update();
+                if (panelMesh && camera) {
+                    panelMesh.lookAt(camera.position);
+                }
+                if (renderer && scene && camera) {
+                    renderer.render(scene, camera);
+                }
+            }
+
+            function applyFloorTextures() {
+                if (!floorMesh) return;
+                const loader = new THREE.TextureLoader();
+                const ground = loader.load('/assets/green-grass.png');
+                ground.wrapS = THREE.MirroredRepeatWrapping;
+                ground.wrapT = THREE.MirroredRepeatWrapping;
+                ground.repeat.set(1.5, 1.5);
+                ground.colorSpace = THREE.SRGBColorSpace;
+                floorMesh.material.map = ground;
+                floorMesh.material.normalMap = null;
+                floorMesh.material.roughnessMap = null;
+                floorMesh.material.roughness = 0.9;
+                floorMesh.material.needsUpdate = true;
+            }
+
+            init();
+        </script>
+        {% endraw %}
+    </body>
+</html>
