@@ -1,5 +1,7 @@
+__pycache__/
 **/cache/
+logs/
 output/
+tmp/
 wandb/
 .env
-__pycache__

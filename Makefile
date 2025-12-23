@@ -1,14 +1,16 @@
 include .env	# TMP, MODEL_PATH
 
-CONFIG_FILE ?= /workspace/imposter/configs/v2/config.toml
+CONFIG_FILE ?= /workspace/impostor/configs/v2/config.toml
 MODEL_PATH ?= /workspace/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
 TMP ?= /workspace/tmp
 
 LORA_DIR ?= impostor-v2-step00000800-state
 
+PNPM ?= pnpm
+
 .ONESHELL:
-.PHONY: train cache
+.PHONY: train cache demo frontend-build
 
 # Models
 models = \
@@ -112,3 +114,9 @@ $(models):
 
 app:
 	@PYTHONPATH=demo uv run python -m app
+
+frontend-build:
+	cd frontend && $(PNPM) run build
+
+demo: frontend-build
+	uv run fastapi dev main.py

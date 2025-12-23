@@ -3,7 +3,7 @@ vae = "/workspace/models/vae/diffusion_pytorch_model.safetensors"
 text_encoder1 = "/workspace/models/text_encoder/model-00001-of-00004.safetensors"
 text_encoder2 = "/workspace/models/text_encoder_2/model.safetensors"
 image_encoder = "/workspace/models/image_encoder/model.safetensors"
-dataset_config = "/workspace/impostor/configs/v1/dataset.toml"
+dataset_config = "/workspace/impostor/configs/v3/dataset.toml"
 
 # hv_train_network.NetworkTrainer#train で参照されるオプション
 fp8_base = true
@@ -33,10 +33,10 @@ learning_rate = 1e-3
 # L40S (VRAM 48GB)のうち32GB程度しか使っていないようなので、gradient_checkpointing = false でも問題ないかもしれない
 # しかし速度がそこまで上がると思えないのでtrueのままで
 gradient_checkpointing = true
-max_data_loader_n_workers = 1
+max_data_loader_n_workers = 2
 persistent_data_loader_workers = true
 # どうせ途中で止めるので...
-max_train_steps = 2000
+max_train_steps = 5000
 
 timestep_sampling = "shift"
 discrete_flow_shift = 7.0
@@ -51,7 +51,7 @@ save_state_on_train_end = true
 f1 = false
 
 output_dir = "output"
-output_name = "impostor-v1"
+output_name = "impostor-v3"
 log_with = "wandb"
 log_tracker_name = "impostor"
 log_config = true
@@ -63,9 +63,13 @@ save_state_to_huggingface = true
 
 # Sampling options
 sample_at_first = true
-sample_every_n_steps = 5
-sample_prompts = "/workspace/impostor/configs/v1/prompts.txt"
+sample_every_n_steps = 100
+sample_prompts = "/workspace/impostor/configs/v3/prompts.txt"
 
 fp8_llm = true
 vae_chunk_size = 32
 vae_spatial_tile_sample_min_size = 128
+
+vae_dtype = "float16"
+dit_dtype = "bfloat16"
+sample_solver = "unipc"

@@ -1,9 +1,9 @@
-# Imposter
+# Impostor
 
 ## Demo
 
 ```sh
-uv run demo/app.py
+make demo
 ```
 
 ## Setup
@@ -16,10 +16,10 @@ uv run demo/app.py
 cd /workspace
 mkdir -p models
 mkdir -p tmp
-git clone https://huggingface.co/datasets/sawara-dev/imposter-data
+git clone https://huggingface.co/datasets/sawara-dev/impostor-data
 git clone https://huggingface.co/datasets/xhiroga/data
-git clone https://github.com/xhiroga/imposter
-cd imposter
+git clone https://github.com/xhiroga/impostor
+cd impostor
 uv venv
 uv pip install hatchling
 uv sync
