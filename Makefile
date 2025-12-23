@@ -116,7 +116,7 @@ app:
 	@PYTHONPATH=demo uv run python -m app
 
 frontend-build:
-	cd frontend && $(PNPM) run build
+	cd frontend &&  $(PNPM) install && $(PNPM) run build
 
 demo: frontend-build
 	uv run fastapi dev main.py
