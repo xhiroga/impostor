@@ -1,10 +1,10 @@
 include .env	# TMP, MODEL_PATH
 export $(shell awk -F= '/^[A-Za-z_][A-Za-z0-9_]*=/{print $$1}' .env)
 
-CONFIG_FILE ?= /workspace/impostor/configs/v3/config.toml
-MODEL_PATH ?= /workspace/models
+CONFIG_FILE ?= /home/s2430011/workspace/pseudo-imposter/impostor/configs/v3/config.toml
+MODEL_PATH ?= /home/s2430011/workspace/pseudo-imposter/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
-TMP ?= /workspace/tmp
+TMP ?= /home/s2430011/workspace/pseudo-imposter/tmp
 
 LORA_DIR ?= impostor-v2-step00001900-bf16
 
@@ -121,3 +121,6 @@ frontend-build:
 
 demo: frontend-build
 	uv run fastapi dev main.py
+
+clone_impostor_data:
+	git clone https://$$HUGGINGFACE_TOKEN@huggingface.co/datasets/sawara-dev/impostor-data ../impostor-data
