@@ -1,11 +1,12 @@
 include .env	# TMP, MODEL_PATH
+export $(shell awk -F= '/^[A-Za-z_][A-Za-z0-9_]*=/{print $$1}' .env)
 
-CONFIG_FILE ?= /workspace/impostor/configs/v2/config.toml
+CONFIG_FILE ?= /workspace/impostor/configs/v3/config.toml
 MODEL_PATH ?= /workspace/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
 TMP ?= /workspace/tmp
 
-LORA_DIR ?= impostor-v2-step00000800-state
+LORA_DIR ?= impostor-v2-step00001900-bf16
 
 PNPM ?= pnpm
 
