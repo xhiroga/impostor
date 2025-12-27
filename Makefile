@@ -1,6 +1,6 @@
 include .env	# TMP, MODEL_PATH
 
-CONFIG_FILE ?= /workspace/impostor/configs/v2/config.toml
+CONFIG_FILE ?= /workspace/impostor/configs/wan/v1/config.toml
 MODEL_PATH ?= /workspace/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
 TMP ?= /workspace/tmp
@@ -64,6 +64,26 @@ $(MODEL_PATH)/image_encoder/model.safetensors: FILE=image_encoder/model.safetens
 $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: REPO=sawara-dev/impostor-models
 $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: FILE=$(LORA_DIR)/model.safetensors
 
+wan_models = \
+	$(MODEL_PATH)/text_encoder/models_t5_umt5-xxl-enc-bf16.pth \
+	$(MODEL_PATH)/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth \
+	$(MODEL_PATH)/vae/wan_2.1_vae.safetensors \
+	$(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors
+
+$(MODEL_PATH)/text_encoder/models_t5_umt5-xxl-enc-bf16.pth: REPO=Wan-AI/Wan2.1-I2V-14B-720P
+$(MODEL_PATH)/text_encoder/models_t5_umt5-xxl-enc-bf16.pth: FILE=models_t5_umt5-xxl-enc-bf16.pth
+
+$(MODEL_PATH)/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth: REPO=Wan-AI/Wan2.1-I2V-14B-720P
+$(MODEL_PATH)/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth: FILE=models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth
+
+# wan_2.1_vae is OK for WAN2.2 14B
+$(MODEL_PATH)/vae/wan_2.1_vae.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
+$(MODEL_PATH)/vae/wan_2.1_vae.safetensors: FILE=split_files/vae/wan_2.1_vae.safetensors
+
+# musubi-tuner only supports bf16, fp16 and fp8_e4m3fn
+$(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
+$(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: FILE=split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors
+
 train: .venv
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
 
@@ -102,11 +122,48 @@ cache: .venv $(models)
 # というか24GiBでも不要かも。--vae_chunk_size なしでも、Memory-Usageは13000MiB程度。
 # https://deepwiki.com/search/vaetiling-vaespatialtilesample_d53d814c-27e9-405f-a43f-111b316047a3
 
+wan_train: .venv
+	uv run wandb login $(WANDB_API_KEY)
+	uv  run \
+		accelerate launch \
+			--num_processes 1 \
+			--dynamo_backend=no \
+			--mixed_precision bf16 \
+			-m musubi_tuner.wan_train_network \
+				--config_file $(CONFIG_FILE) \
+				--huggingface_token $(HUGGINGFACE_TOKEN)
+	sleep 10m ; runpodctl stop pod $(RUNPOD_POD_ID) &
+
+
+wan_cache: .venv $(wan_models)
+	DATASET_CONFIG=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["dataset_config"])')
+	VAE=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["vae"])')
+	T5=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["t5"])')
+	CLIP=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["clip"])')
+
+	uv run -m musubi_tuner.wan_cache_latents \
+		--dataset_config $$DATASET_CONFIG \
+		--vae $$VAE \
+		--clip $$CLIP \
+		--i2v
+
+	uv run -m musubi_tuner.wan_cache_text_encoder_outputs \
+		--dataset_config $$DATASET_CONFIG \
+		--t5 $$T5 \
+		--batch_size 16
+
 .venv:
 	uv sync
 
 models: $(models)
 $(models):
+	if uvx --from "huggingface_hub[cli]" hf auth whoami | grep -q 'Not logged in'; then uvx --from "huggingface_hub[cli]" hf auth login --token=$(HUGGINGFACE_TOKEN); fi
+	uvx --from "huggingface_hub[cli]" hf download $(REPO) $(FILE) --local-dir $(TMP)/$(REPO)
+	mkdir -p $(dir $@)
+	mv $(TMP)/$(REPO)/$(FILE) $@
+
+wan_models: $(wan_models)
+$(wan_models):
 	if uvx --from "huggingface_hub[cli]" hf auth whoami | grep -q 'Not logged in'; then uvx --from "huggingface_hub[cli]" hf auth login --token=$(HUGGINGFACE_TOKEN); fi
 	uvx --from "huggingface_hub[cli]" hf download $(REPO) $(FILE) --local-dir $(TMP)/$(REPO)
 	mkdir -p $(dir $@)

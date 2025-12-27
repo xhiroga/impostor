@@ -1,0 +1,13 @@
+# Spec: https://github.com/kohya-ss/musubi-tuner/blob/main/dataset/dataset_config.md
+
+[general]
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = false
+
+[[datasets]]
+video_jsonl_file = "/workspace/impostor/configs/wan/v1/metadata_81f.jsonl"
+frame_extraction = "full"
+cache_directory = "/workspace/impostor/configs/wan/v1/cache"
+resolution = [768, 768]
+num_repeats = 1 # optional, default is 1. Same as above.
