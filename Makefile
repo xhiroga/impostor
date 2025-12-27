@@ -84,11 +84,11 @@ $(MODEL_PATH)/vae/wan_2.1_vae.safetensors: FILE=split_files/vae/wan_2.1_vae.safe
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: FILE=split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors
 
-train: .venv
+train:
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
 
 	uv run wandb login $(WANDB_API_KEY)
-	uv  run \
+	uv run \
 		accelerate launch \
 			--num_processes 1 \
 			--dynamo_backend=no \
@@ -99,7 +99,7 @@ train: .venv
 				--huggingface_token $(HUGGINGFACE_TOKEN)
 	sleep 10m ; runpodctl stop pod $(RUNPOD_POD_ID) &
 
-cache: .venv $(models)
+cache: $(models)
 	DATASET_CONFIG=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["dataset_config"])')
 	VAE=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["vae"])')
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
@@ -122,7 +122,7 @@ cache: .venv $(models)
 # というか24GiBでも不要かも。--vae_chunk_size なしでも、Memory-Usageは13000MiB程度。
 # https://deepwiki.com/search/vaetiling-vaespatialtilesample_d53d814c-27e9-405f-a43f-111b316047a3
 
-wan_train: .venv
+wan_train:
 	uv run wandb login $(WANDB_API_KEY)
 	uv  run \
 		accelerate launch \
@@ -135,7 +135,7 @@ wan_train: .venv
 	sleep 10m ; runpodctl stop pod $(RUNPOD_POD_ID) &
 
 
-wan_cache: .venv $(wan_models)
+wan_cache: $(wan_models)
 	DATASET_CONFIG=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["dataset_config"])')
 	VAE=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["vae"])')
 	T5=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["t5"])')
@@ -152,9 +152,6 @@ wan_cache: .venv $(wan_models)
 		--t5 $$T5 \
 		--batch_size 16
 
-.venv:
-	uv sync
-
 models: $(models)
 $(models):
 	if uvx --from "huggingface_hub[cli]" hf auth whoami | grep -q 'Not logged in'; then uvx --from "huggingface_hub[cli]" hf auth login --token=$(HUGGINGFACE_TOKEN); fi
@@ -168,9 +165,6 @@ $(wan_models):
 	uvx --from "huggingface_hub[cli]" hf download $(REPO) $(FILE) --local-dir $(TMP)/$(REPO)
 	mkdir -p $(dir $@)
 	mv $(TMP)/$(REPO)/$(FILE) $@
-
-app:
-	@PYTHONPATH=demo uv run python -m app
 
 frontend-build:
 	cd frontend && $(PNPM) install && $(PNPM) run build
