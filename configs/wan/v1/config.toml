@@ -43,8 +43,7 @@ seed = 42
 output_dir = "output"
 output_name = "impostor-wan/v1"
 
-offload_inactive_dit = true
-# blocks_to_swap = 20   # offload_inactive_ditと併用不可
+blocks_to_swap = 20
 
 save_state = true
 save_state_on_train_end = true
