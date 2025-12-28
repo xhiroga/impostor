@@ -6,7 +6,7 @@ dataset_config = "/workspace/impostor/configs/wan/v1/dataset.toml"
 
 # cacheでのみ使用する
 vae = "/workspace/models/vae/wan_2.1_vae.safetensors"
-t5 = "/workspace/models/text_encoder/models_t5_umt5-xxl-enc-bf16.pth"
+t5 = "/workspace/models/text_encoders/models_t5_umt5-xxl-enc-bf16.pth"
 clip = "/workspace/models/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
 
 sdpa = true

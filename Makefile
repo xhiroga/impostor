@@ -7,10 +7,8 @@ TMP ?= /workspace/tmp
 
 LORA_DIR ?= impostor-v2-step00000800-state
 
-PNPM ?= pnpm
-
 .ONESHELL:
-.PHONY: train cache demo frontend-build
+.PHONY: train cache models wan_train wan_cache wan_models run-comfyui frontend-build demo
 
 # Models
 models = \
@@ -21,10 +19,10 @@ models = \
 	$(MODEL_PATH)/diffusion_models/FramePack_F1_I2V_HY_20250503/diffusion_pytorch_model-00002-of-00003.safetensors \
 	$(MODEL_PATH)/diffusion_models/FramePack_F1_I2V_HY_20250503/diffusion_pytorch_model-00003-of-00003.safetensors \
 	$(MODEL_PATH)/vae/diffusion_pytorch_model.safetensors \
-	$(MODEL_PATH)/text_encoder/model-00001-of-00004.safetensors \
-	$(MODEL_PATH)/text_encoder/model-00002-of-00004.safetensors \
-	$(MODEL_PATH)/text_encoder/model-00003-of-00004.safetensors \
-	$(MODEL_PATH)/text_encoder/model-00004-of-00004.safetensors \
+	$(MODEL_PATH)/text_encoders/model-00001-of-00004.safetensors \
+	$(MODEL_PATH)/text_encoders/model-00002-of-00004.safetensors \
+	$(MODEL_PATH)/text_encoders/model-00003-of-00004.safetensors \
+	$(MODEL_PATH)/text_encoders/model-00004-of-00004.safetensors \
 	$(MODEL_PATH)/text_encoder_2/model.safetensors \
 	$(MODEL_PATH)/image_encoder/model.safetensors \
 	$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors
@@ -46,14 +44,14 @@ $(MODEL_PATH)/diffusion_models/FramePack_F1_I2V_HY_20250503/diffusion_pytorch_mo
 $(MODEL_PATH)/vae/diffusion_pytorch_model.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
 $(MODEL_PATH)/vae/diffusion_pytorch_model.safetensors: FILE=vae/diffusion_pytorch_model.safetensors
 
-$(MODEL_PATH)/text_encoder/model-00001-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
-$(MODEL_PATH)/text_encoder/model-00001-of-00004.safetensors: FILE=text_encoder/model-00001-of-00004.safetensors
-$(MODEL_PATH)/text_encoder/model-00002-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
-$(MODEL_PATH)/text_encoder/model-00002-of-00004.safetensors: FILE=text_encoder/model-00002-of-00004.safetensors
-$(MODEL_PATH)/text_encoder/model-00003-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
-$(MODEL_PATH)/text_encoder/model-00003-of-00004.safetensors: FILE=text_encoder/model-00003-of-00004.safetensors
-$(MODEL_PATH)/text_encoder/model-00004-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
-$(MODEL_PATH)/text_encoder/model-00004-of-00004.safetensors: FILE=text_encoder/model-00004-of-00004.safetensors
+$(MODEL_PATH)/text_encoders/model-00001-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
+$(MODEL_PATH)/text_encoders/model-00001-of-00004.safetensors: FILE=text_encoder/model-00001-of-00004.safetensors
+$(MODEL_PATH)/text_encoders/model-00002-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
+$(MODEL_PATH)/text_encoders/model-00002-of-00004.safetensors: FILE=text_encoder/model-00002-of-00004.safetensors
+$(MODEL_PATH)/text_encoders/model-00003-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
+$(MODEL_PATH)/text_encoders/model-00003-of-00004.safetensors: FILE=text_encoder/model-00003-of-00004.safetensors
+$(MODEL_PATH)/text_encoders/model-00004-of-00004.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
+$(MODEL_PATH)/text_encoders/model-00004-of-00004.safetensors: FILE=text_encoder/model-00004-of-00004.safetensors
 
 $(MODEL_PATH)/text_encoder_2/model.safetensors: REPO=hunyuanvideo-community/HunyuanVideo
 $(MODEL_PATH)/text_encoder_2/model.safetensors: FILE=text_encoder_2/model.safetensors
@@ -65,16 +63,27 @@ $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: REPO=sawara-dev/impostor-mode
 $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: FILE=$(LORA_DIR)/model.safetensors
 
 wan_models = \
-	$(MODEL_PATH)/text_encoder/models_t5_umt5-xxl-enc-bf16.pth \
+	$(MODEL_PATH)/text_encoders/models_t5_umt5-xxl-enc-bf16.pth \
+	$(MODEL_PATH)/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors \
 	$(MODEL_PATH)/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth \
+	$(MODEL_PATH)/clip_vision/clip_vision_h.safetensors \
 	$(MODEL_PATH)/vae/wan_2.1_vae.safetensors \
-	$(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors
+	$(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors \
+	$(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors
 
-$(MODEL_PATH)/text_encoder/models_t5_umt5-xxl-enc-bf16.pth: REPO=Wan-AI/Wan2.1-I2V-14B-720P
-$(MODEL_PATH)/text_encoder/models_t5_umt5-xxl-enc-bf16.pth: FILE=models_t5_umt5-xxl-enc-bf16.pth
+# text_encoders
+$(MODEL_PATH)/text_encoders/models_t5_umt5-xxl-enc-bf16.pth: REPO=Wan-AI/Wan2.1-I2V-14B-720P
+$(MODEL_PATH)/text_encoders/models_t5_umt5-xxl-enc-bf16.pth: FILE=models_t5_umt5-xxl-enc-bf16.pth
+## ComfyUI
+$(MODEL_PATH)/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
+$(MODEL_PATH)/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors: FILE=split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
 
+# clip_vision
 $(MODEL_PATH)/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth: REPO=Wan-AI/Wan2.1-I2V-14B-720P
 $(MODEL_PATH)/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth: FILE=models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth
+## ComfyUI
+$(MODEL_PATH)/clip_vision/clip_vision_h.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
+$(MODEL_PATH)/clip_vision/clip_vision_h.safetensors: FILE=split_files/clip_vision/clip_vision_h.safetensors
 
 # wan_2.1_vae is OK for WAN2.2 14B
 $(MODEL_PATH)/vae/wan_2.1_vae.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
@@ -83,6 +92,9 @@ $(MODEL_PATH)/vae/wan_2.1_vae.safetensors: FILE=split_files/vae/wan_2.1_vae.safe
 # musubi-tuner only supports bf16, fp16 and fp8_e4m3fn
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: FILE=split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors
+## ComfyUI
+$(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors: REPO=alibaba-pai/Wan2.1-Fun-1.3B-Control
+$(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors: FILE=diffusion_pytorch_model.safetensors
 
 train:
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
@@ -166,8 +178,15 @@ $(wan_models):
 	mkdir -p $(dir $@)
 	mv $(TMP)/$(REPO)/$(FILE) $@
 
+comfy/ComfyUI:
+	git -C $@ pull || git clone https://github.com/comfyanonymous/ComfyUI $@
+	cd $@ && python -m venv venv && venv/bin/pip install -r requirements.txt && venv/bin/pip install -r manager_requirements.txt
+
+run-comfyui:
+	comfy/ComfyUI/venv/bin/python comfy/ComfyUI/main.py --enable-manager --extra-model-paths-config $(COMFY_EXTRA_MODEL_PATHS_CONFIG)
+
 frontend-build:
-	cd frontend && $(PNPM) install && $(PNPM) run build
+	cd frontend && pnpm install && pnpm run build
 
 demo: frontend-build
 	uv run fastapi dev main.py

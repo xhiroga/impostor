@@ -1,0 +1,5 @@
+extra/ComfyUI:
+  clip_vision: /workspace/models/clip_vision/
+  diffusion_models: /workspace/models/diffusion_models/
+  text_encoders: /workspace/models/text_encoders/
+  vae: /workspace/models/vae/

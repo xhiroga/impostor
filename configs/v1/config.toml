@@ -1,6 +1,6 @@
 dit = "/workspace/models/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors"
 vae = "/workspace/models/vae/diffusion_pytorch_model.safetensors"
-text_encoder1 = "/workspace/models/text_encoder/model-00001-of-00004.safetensors"
+text_encoder1 = "/workspace/models/text_encoders/model-00001-of-00004.safetensors"
 text_encoder2 = "/workspace/models/text_encoder_2/model.safetensors"
 image_encoder = "/workspace/models/image_encoder/model.safetensors"
 dataset_config = "/workspace/impostor/configs/v1/dataset.toml"
