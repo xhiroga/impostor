@@ -1,19 +1,21 @@
-task = "i2v-14B"
+# v2: Wan2.2 の LoRA開発の難易度について把握しておく目的
+task = "i2v-A14B"
 
-dit = "/workspace/models/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors"
-# dit_high_noise, timestep_boundary は WAN2.2 限定の設定
-dataset_config = "/workspace/impostor/configs/wan/v1/dataset.toml"
+dit = "/workspace/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+dit_high_noise = "/workspace/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors"
+timestep_boundary = 0.9
+dataset_config = "/workspace/impostor/configs/wan/v2/dataset.toml"
 
 # cacheでのみ使用する
 vae = "/workspace/models/vae/wan_2.1_vae.safetensors"
 t5 = "/workspace/models/text_encoders/models_t5_umt5-xxl-enc-bf16.pth"
-clip = "/workspace/models/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
+# Wan2.2 では CLIPは不要
 
 sdpa = true
 # flash_attn = true   # または --sdpa, --xformers, --flash_attn
 
 # <https://github.com/kohya-ss/musubi-tuner/blob/main/docs/wan.md#model-support-matrix--モデルサポートマトリックス> を参照
-mixed_precision = "bf16"
+mixed_precision = "fp16"
 
 optimizer_type = "adamw8bit"
 learning_rate = 2e-4
@@ -31,16 +33,17 @@ network_dim = 32
 timestep_sampling = "shift"
 discrete_flow_shift = 5.0
 
-# どうせ途中で止めるので...
+# どうせ途中で止めるので
 max_train_steps = 5000
-save_every_n_steps = 500
+# とりあえず学習が回ることの確認用
+save_every_n_steps = 50
 
 seed = 42
 
 output_dir = "output/impostor-wan"
-output_name = "v1"
+output_name = "v2"
 
-blocks_to_swap = 20
+blocks_to_swap = 16   # RTX6000Pro (VRAM 96GB) でもいくらかは必要（なぜ...？）VRAM 32GBでは16程度らしいが...
 
 save_state = true
 save_state_on_train_end = true
@@ -51,10 +54,12 @@ log_config = true
 
 huggingface_repo_id = "sawara-dev/impostor-models"
 huggingface_repo_type = "model"
-huggingface_path_in_repo = "/wan2.1"
+huggingface_path_in_repo = "/wan2.2"
 save_state_to_huggingface = true
 
 # Sampling options
-sample_at_first = true
-sample_every_n_steps = 100
-sample_prompts = "/workspace/impostor/configs/wan/v1/prompts.txt"
+# 推論中のVRAM使用率は78GiB/96GiBになる
+sample_at_first = false
+# 学習設定確認用なので頻度高め
+sample_every_n_steps = 50
+sample_prompts = "/workspace/impostor/configs/wan/v2/prompts.txt"

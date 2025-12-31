@@ -1,6 +1,6 @@
 include .env	# TMP, MODEL_PATH
 
-CONFIG_FILE ?= /workspace/impostor/configs/wan/v1/config.toml
+CONFIG_FILE ?= /workspace/impostor/configs/wan/v2/config.toml
 MODEL_PATH ?= /workspace/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
 TMP ?= /workspace/tmp
@@ -69,7 +69,10 @@ wan_models = \
 	$(MODEL_PATH)/clip_vision/clip_vision_h.safetensors \
 	$(MODEL_PATH)/vae/wan_2.1_vae.safetensors \
 	$(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors \
-	$(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors
+	$(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors \
+	$(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors \
+	$(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors \
+	$(MODEL_PATH)/diffusion_models/Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors
 
 # text_encoders
 $(MODEL_PATH)/text_encoders/models_t5_umt5-xxl-enc-bf16.pth: REPO=Wan-AI/Wan2.1-I2V-14B-720P
@@ -92,9 +95,18 @@ $(MODEL_PATH)/vae/wan_2.1_vae.safetensors: FILE=split_files/vae/wan_2.1_vae.safe
 # musubi-tuner only supports bf16, fp16 and fp8_e4m3fn
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: FILE=split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors
-## ComfyUI
+## Wan2.2
+$(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_repackaged
+$(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors: FILE=split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors
+$(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_repackaged
+$(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors: FILE=split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors
+
+## Wan2.1 Fun Control for ComfyUI
 $(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors: REPO=alibaba-pai/Wan2.1-Fun-1.3B-Control
 $(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors: FILE=diffusion_pytorch_model.safetensors
+## Wan 2.1 ATI for ComfyUI
+$(MODEL_PATH)/diffusion_models/Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors: REPO=Kijai/WanVideo_comfy
+$(MODEL_PATH)/diffusion_models/Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors: FILE=Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors
 
 train:
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
@@ -156,7 +168,7 @@ wan_cache: $(wan_models)
 	uv run -m musubi_tuner.wan_cache_latents \
 		--dataset_config $$DATASET_CONFIG \
 		--vae $$VAE \
-		--clip $$CLIP \
+		$${CLIP:+--clip $$CLIP} \
 		--i2v
 
 	uv run -m musubi_tuner.wan_cache_text_encoder_outputs \
