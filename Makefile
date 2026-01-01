@@ -10,7 +10,7 @@ LORA_DIR ?= impostor-v2-step00000800-state
 .ONESHELL:
 .PHONY: train cache models wan_train wan_cache wan_models run-comfyui frontend-build demo
 
-# Models
+# Models (Total < 200GB)
 models = \
 	$(MODEL_PATH)/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors \
 	$(MODEL_PATH)/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00002-of-00003.safetensors \
@@ -62,6 +62,7 @@ $(MODEL_PATH)/image_encoder/model.safetensors: FILE=image_encoder/model.safetens
 $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: REPO=sawara-dev/impostor-models
 $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: FILE=$(LORA_DIR)/model.safetensors
 
+# WAN2.1 / WAN2.2 Models (Total < 200GB)
 wan_models = \
 	$(MODEL_PATH)/text_encoders/models_t5_umt5-xxl-enc-bf16.pth \
 	$(MODEL_PATH)/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors \
@@ -71,6 +72,10 @@ wan_models = \
 	$(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors \
 	$(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors \
 	$(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors \
+	$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors \
+	$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors \
+	$(MODEL_PATH)/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
+	$(MODEL_PATH)/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
 	$(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors \
 	$(MODEL_PATH)/diffusion_models/Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors
 
@@ -95,11 +100,21 @@ $(MODEL_PATH)/vae/wan_2.1_vae.safetensors: FILE=split_files/vae/wan_2.1_vae.safe
 # musubi-tuner only supports bf16, fp16 and fp8_e4m3fn
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: REPO=Comfy-Org/Wan_2.1_ComfyUI_repackaged
 $(MODEL_PATH)/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors: FILE=split_files/diffusion_models/wan2.1_i2v_720p_14B_bf16.safetensors
-## Wan2.2
+## Wan2.2 i2v
 $(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_repackaged
 $(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors: FILE=split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors
 $(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_repackaged
 $(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors: FILE=split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors
+## Wan2.2 Camera Control
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors: FILE=split_files/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors: FILE=split_files/diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors
+## Wan2.2 LoRA
+$(MODEL_PATH)/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+$(MODEL_PATH)/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors: FILE=split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
+$(MODEL_PATH)/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+$(MODEL_PATH)/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors: FILE=split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
 
 ## Wan2.1 Fun Control for ComfyUI
 $(MODEL_PATH)/diffusion_models/diffusion_pytorch_model.safetensors: REPO=alibaba-pai/Wan2.1-Fun-1.3B-Control
@@ -183,26 +198,6 @@ diffsynth_train:
 		--height 480 \
 		--width 832 \
 		--dataset_repeat 100 \
-		--model_id_with_origin_paths "PAI/Wan2.2-Fun-A14B-Control-Camera:high_noise_model/diffusion_pytorch_model*.safetensors,PAI/Wan2.2-Fun-A14B-Control-Camera:models_t5_umt5-xxl-enc-bf16.pth,PAI/Wan2.2-Fun-A14B-Control-Camera:Wan2.1_VAE.pth" \
-		--learning_rate 1e-4 \
-		--num_epochs 5 \
-		--remove_prefix_in_ckpt "pipe.dit." \
-		--output_path "./models/train/Wan2.2-Fun-A14B-Control-Camera_high_noise_lora" \
-		--lora_base_model "dit" \
-		--lora_target_modules "q,k,v,o,ffn.0,ffn.2" \
-		--lora_rank 32 \
-		--extra_inputs "input_image,camera_control_direction,camera_control_speed" \
-		--max_timestep_boundary 0.358 \
-		--min_timestep_boundary 0
-# boundary corresponds to timesteps [900, 1000]
-
-	uv run accelerate launch -m examples.wanvideo.model_training.train \
-		--dataset_base_path data/example_video_dataset \
-		--dataset_metadata_path data/example_video_dataset/metadata_camera_control.csv \
-		--data_file_keys "video,control_video,reference_image" \
-		--height 480 \
-		--width 832 \
-		--dataset_repeat 100 \
 		--model_id_with_origin_paths "PAI/Wan2.2-Fun-A14B-Control-Camera:low_noise_model/diffusion_pytorch_model*.safetensors,PAI/Wan2.2-Fun-A14B-Control-Camera:models_t5_umt5-xxl-enc-bf16.pth,PAI/Wan2.2-Fun-A14B-Control-Camera:Wan2.1_VAE.pth" \
 		--learning_rate 1e-4 \
 		--num_epochs 5 \
@@ -215,6 +210,26 @@ diffsynth_train:
 		--max_timestep_boundary 1 \
 		--min_timestep_boundary 0.358
 # boundary corresponds to timesteps [0, 900]
+
+	uv run accelerate launch -m examples.wanvideo.model_training.train \
+		--dataset_base_path /workspace/impostor-data \
+		--dataset_metadata_path /workspace/impostor/configs/diffsynth/v1/metadata_camera_control.csv \
+		--data_file_keys "video,control_video,reference_image" \
+		--height 480 \
+		--width 832 \
+		--dataset_repeat 100 \
+		--model_id_with_origin_paths "PAI/Wan2.2-Fun-A14B-Control-Camera:high_noise_model/diffusion_pytorch_model*.safetensors,PAI/Wan2.2-Fun-A14B-Control-Camera:models_t5_umt5-xxl-enc-bf16.pth,PAI/Wan2.2-Fun-A14B-Control-Camera:Wan2.1_VAE.pth" \
+		--learning_rate 1e-4 \
+		--num_epochs 5 \
+		--remove_prefix_in_ckpt "pipe.dit." \
+		--output_path "./models/train/Wan2.2-Fun-A14B-Control-Camera_high_noise_lora" \
+		--lora_base_model "dit" \
+		--lora_target_modules "q,k,v,o,ffn.0,ffn.2" \
+		--lora_rank 32 \
+		--extra_inputs "input_image,camera_control_direction,camera_control_speed" \
+		--max_timestep_boundary 0.358 \
+		--min_timestep_boundary 0
+# boundary corresponds to timesteps [900, 1000]
 
 models: $(models)
 $(models):
