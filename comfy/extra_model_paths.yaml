@@ -4,3 +4,9 @@ extra/ComfyUI:
   loras: /workspace/models/loras/
   text_encoders: /workspace/models/text_encoders/
   vae: /workspace/models/vae/
+
+diffsynth:
+  loras: /workspace/impostor-models/diffsynth/
+
+wan2.2:
+  loras: /workspace/impostor-models/wan2.2
