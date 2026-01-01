@@ -1,0 +1,16 @@
+video,control_video,reference_image,prompt,camera_control_direction,camera_control_speed
+tripo3d/asagi_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/asagi_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/camel_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/camel_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/fox_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/fox_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/kitsu_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/kitsu_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/kongo_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/kongo_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/kuja_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/kuja_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/leopard_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/leopard_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/lion_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/lion_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/owl_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/owl_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/pan_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/pan_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/parrot_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/parrot_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/tanu_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/tanu_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/tiger_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/tiger_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/turtle_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/turtle_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
+tripo3d/usa_786x768_30fps_81f.mp4,private/corn_786x768_30fps_81f.mp4,tripo3d/usa_786x768_30fps_81f.png,"360-degree orbit around the subject, camera rising in a spiral.",Left,0.01
