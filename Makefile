@@ -74,6 +74,8 @@ wan_models = \
 	$(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors \
 	$(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors \
 	$(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors \
+	$(MODEL_PATH)/diffusion_models/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors \
+	$(MODEL_PATH)/diffusion_models/wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors \
 	$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors \
 	$(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors \
 	$(MODEL_PATH)/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
@@ -111,6 +113,12 @@ $(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors:
 $(MODEL_PATH)/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors: FILE=split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
 $(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_repackaged
 $(MODEL_PATH)/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors: FILE=split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+## Wan2.2 Fun Control
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors: FILE=split_files/diffusion_models/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+$(MODEL_PATH)/diffusion_models/wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors: FILE=split_files/diffusion_models/wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors
+
 ## Wan2.2 Camera Control
 $(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors: REPO=Comfy-Org/Wan_2.2_ComfyUI_Repackaged
 $(MODEL_PATH)/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors: FILE=split_files/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors
