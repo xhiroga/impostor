@@ -25,7 +25,10 @@ models = \
 	$(MODEL_PATH)/text_encoders/model-00004-of-00004.safetensors \
 	$(MODEL_PATH)/text_encoder_2/model.safetensors \
 	$(MODEL_PATH)/image_encoder/model.safetensors \
-	$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors
+	$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors \
+	$(MODEL_PATH)/text_encoders/clip_l.safetensors \
+	$(MODEL_PATH)/text_encoders/llava_llama3_fp8_scaled.safetensors \
+	$(MODEL_PATH)/clip_vision/sigclip_vision_patch14_384.safetensors \
 
 $(MODEL_PATH)/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors: REPO=lllyasviel/FramePackI2V_HY
 $(MODEL_PATH)/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors: FILE=diffusion_pytorch_model-00001-of-00003.safetensors
@@ -61,6 +64,14 @@ $(MODEL_PATH)/image_encoder/model.safetensors: FILE=image_encoder/model.safetens
 
 $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: REPO=sawara-dev/impostor-models
 $(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: FILE=$(LORA_DIR)/model.safetensors
+
+## for ComfyUI
+$(MODEL_PATH)/text_encoders/clip_l.safetensors: REPO=Comfy-Org/HunyuanVideo_repackaged
+$(MODEL_PATH)/text_encoders/clip_l.safetensors: FILE=split_files/text_encoders/clip_l.safetensors
+$(MODEL_PATH)/text_encoders/llava_llama3_fp8_scaled.safetensors: REPO=Comfy-Org/HunyuanVideo_repackaged
+$(MODEL_PATH)/text_encoders/llava_llama3_fp8_scaled.safetensors: FILE=split_files/text_encoders/llava_llama3_fp8_scaled.safetensors
+$(MODEL_PATH)/clip_vision/sigclip_vision_patch14_384.safetensors: REPO=Comfy-Org/sigclip_vision_384
+$(MODEL_PATH)/clip_vision/sigclip_vision_patch14_384.safetensors: FILE=sigclip_vision_patch14_384.safetensors
 
 # WAN2.1 / WAN2.2 Models (Total < 200GB)
 wan_models = \
