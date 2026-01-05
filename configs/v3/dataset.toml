@@ -6,7 +6,7 @@ enable_bucket = true
 bucket_no_upscale = false
 
 [[datasets]]
-video_jsonl_file = "/workspace/impostor/configs/v3/metadata_81f.jsonl"
+video_jsonl_file = "/workspace/impostor/configs/v3/metadata_73f.jsonl"
 frame_extraction = "full"
 cache_directory = "/workspace/impostor/configs/v3/cache"
 resolution = [768, 768]
