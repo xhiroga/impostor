@@ -1,0 +1,3 @@
+# Cropped
+360-degree orbit around the subject, camera rising in a spiral. --w 768 --h 768 --f 73 --d 42 --s 20 --i /workspace/impostor/configs/prompts/bancho.jpeg
+360-degree orbit around the subject, camera rising in a spiral. --w 768 --h 768 --f 73 --d 42 --s 20 --i /workspace/impostor/configs/prompts/leo.jpeg
