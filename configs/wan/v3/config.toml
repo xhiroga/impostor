@@ -1,0 +1,64 @@
+# v3: Wan2.2 での本格学習
+task = "i2v-A14B"
+
+dit = "/workspace/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+dit_high_noise = "/workspace/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors"
+timestep_boundary = 0.9
+dataset_config = "/workspace/impostor/configs/wan/v3/dataset.toml"
+
+# cacheでのみ使用する
+vae = "/workspace/models/vae/wan_2.1_vae.safetensors"
+t5 = "/workspace/models/text_encoders/models_t5_umt5-xxl-enc-bf16.pth"
+# Wan2.2 では CLIPは不要
+
+sdpa = true
+# flash_attn = true   # または --sdpa, --xformers, --flash_attn
+
+# <https://github.com/kohya-ss/musubi-tuner/blob/main/docs/wan.md#model-support-matrix--モデルサポートマトリックス> を参照
+mixed_precision = "fp16"
+
+optimizer_type = "adamw8bit"
+learning_rate = 2e-4
+gradient_checkpointing = true
+max_data_loader_n_workers = 2
+persistent_data_loader_workers = true
+
+network_module = "networks.lora_wan"
+
+# LoRAの隠れ層のニューロンの数であり、（順伝播時の影響がニューロン数に比例して大きくならないように）重み値を調整する係数の分母でもある。
+# https://deepwiki.com/search/networkdimalphaalpha05025alpha_6132b736-e130-4aec-a97d-90668c4afec1
+network_dim = 32
+# network_alpha = 32
+
+timestep_sampling = "shift"
+discrete_flow_shift = 5.0
+
+# どうせ途中で止めるので
+max_train_steps = 5000
+# とりあえず学習が回ることの確認用
+save_every_n_steps = 200
+
+seed = 42
+
+output_dir = "output/impostor-wan"
+output_name = "v3"
+
+blocks_to_swap = 16   # RTX6000Pro (VRAM 96GB) でもいくらかは必要（なぜ...？）VRAM 32GBでは16程度らしいが...
+
+save_state = true
+save_state_on_train_end = true
+
+log_with = "wandb"
+log_tracker_name = "impostor-wan"
+log_config = true
+
+huggingface_repo_id = "sawara-dev/impostor-models"
+huggingface_repo_type = "model"
+huggingface_path_in_repo = "/wan2.2"
+save_state_to_huggingface = true
+
+# Sampling options
+# 推論中のVRAM使用率は78GiB/96GiBになる
+sample_at_first = false
+sample_every_n_steps = 100
+sample_prompts = "/workspace/impostor/configs/wan/v3/prompts.txt"
