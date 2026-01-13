@@ -1,6 +1,7 @@
 __pycache__/
 **/cache/
 logs/
+models/
 output/
 tmp/
 wandb/
