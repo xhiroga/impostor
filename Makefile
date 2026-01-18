@@ -282,3 +282,6 @@ frontend-build:
 
 demo: frontend-build
 	uv run fastapi dev main.py
+
+evaluation:
+	uv run -m eval/main.py --video $(video)
