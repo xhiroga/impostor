@@ -10,8 +10,8 @@ from typing import Sequence
 if __package__ is None or __package__ == "":
     repo_root = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(repo_root))
-    from eval.video_utils import extract_frames, load_video_frames, resolve_frame_indices
-    from eval.metrics import available_models, build_models
+    from evaluation.video_utils import extract_frames, load_video_frames, resolve_frame_indices
+    from evaluation.metrics import available_models, build_models
 else:  # pragma: no cover - import path shim
     from .video_utils import extract_frames, load_video_frames, resolve_frame_indices
     from .metrics import available_models, build_models
@@ -64,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--result-dir",
         type=Path,
-        default=Path("eval/result"),
+        default=Path("evaluation/result"),
         help="Directory to store evaluation outputs.",
     )
     parser.add_argument(

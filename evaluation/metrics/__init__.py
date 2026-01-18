@@ -3,19 +3,19 @@ from __future__ import annotations
 from typing import Iterable
 
 from .base import EvaluationModel
-from .blur_variance import BlurVarianceModel
 from .clip_similarity import ClipSimilarityModel
 from .cosine_similarity import CosineSimilarityModel
 from .lpips_score import LPIPSModel
 from .psnr import PSNRModel
+from .ssim import SSIMModel
 
 
 _REGISTRY: dict[str, type[EvaluationModel]] = {
-    BlurVarianceModel.name: BlurVarianceModel,
     ClipSimilarityModel.name: ClipSimilarityModel,
     CosineSimilarityModel.name: CosineSimilarityModel,
     LPIPSModel.name: LPIPSModel,
     PSNRModel.name: PSNRModel,
+    SSIMModel.name: SSIMModel,
 }
 
 

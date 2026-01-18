@@ -6,24 +6,24 @@ Video evaluation helper that samples frames from a video and runs pluggable metr
 
 ```bash
 # Run as a module (recommended)
-python -m eval.main --video path/to/video.mp4
+python -m evaluation.main --video path/to/video.mp4
 
 # Choose models and specific frames
-python -m eval.main --video sample/video.mp4 --models psnr cosine --frame-indices 0,15,30
+python -m evaluation.main --video sample/video.mp4 --models psnr cosine --frame-indices 0,15,30
 ```
 
-Results print to stdout and are saved as CSV under `eval/result/`.
+Results print to stdout and are saved as CSV under `evaluation/result/`.
 
 ## Options
 
-- `--models`: subset from `psnr`, `cosine`, `blur`, `clip`, `lpips` (default: all).
+- `--models`: subset from `psnr`, `cosine`, `clip`, `lpips`, `ssim` (default: all).
 - `--frame-indices`: comma-separated indices to sample; overrides stride/max-frames.
 - `--stride`: take every Nth frame when indices are not given.
 - `--max-frames`: cap the number of sampled frames (default: 16).
-- `--result-dir`: output directory (default: `eval/result`).
+- `--result-dir`: output directory (default: `evaluation/result`).
 - Frame numbers in the output correspond to the original video indices; the detail column refers to the sampled order (0-based).
 
-Add new metrics by creating a class in `eval/metrics/` that implements `EvaluationModel` and registering it in `eval/metrics/__init__.py`.
+Add new metrics by creating a class in `evaluation/metrics/` that implements `EvaluationModel` and registering it in `evaluation/metrics/__init__.py`.
 
 ### Optional dependencies
 - `clip` 指標: `pip install open_clip_torch`

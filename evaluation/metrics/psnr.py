@@ -23,14 +23,15 @@ class PSNRModel(EvaluationModel):
 
         for idx in frame_indices[1:]:
             target = frames[idx]
-            mse = F.mse_loss(target, reference).item()
-            psnr = 10.0 * torch.log10(1.0 / (mse + 1e-8)).item()
-            psnr_values.append(psnr)
+            mse = F.mse_loss(target, reference)  # keep as tensor for torch ops
+            psnr = 10.0 * torch.log10(1.0 / (mse + 1e-8))
+            psnr_value = float(psnr.item())
+            psnr_values.append(psnr_value)
             results.append(
                 MetricResult(
                     model=self.name,
                     metric="psnr_pair",
-                    value=psnr,
+                    value=psnr_value,
                     frames_used=(frame_indices[0], idx),
                     detail=f"ref={frame_indices[0]}, cmp={idx}",
                 )
@@ -47,4 +48,3 @@ class PSNRModel(EvaluationModel):
             )
         )
         return results
-
