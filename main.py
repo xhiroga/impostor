@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -82,7 +82,15 @@ async def app_status():
 
 
 @app.post("/api/infer")
-async def run_inference(image: Annotated[UploadFile, File(...)]):
+async def run_inference(
+    image: Annotated[UploadFile, File(...)],
+    steps: Annotated[int | None, Form()] = None,
+    cfg: Annotated[float | None, Form()] = None,
+    lora_multiplier: Annotated[float | None, Form()] = None,
+    prompt: Annotated[str | None, Form()] = None,
+    total_frames: Annotated[int | None, Form()] = None,
+    latent_window_size: Annotated[int | None, Form()] = None,
+):
     if INFER_ENGINE is None:
         raise HTTPException(
             status_code=503,
@@ -105,7 +113,14 @@ async def run_inference(image: Annotated[UploadFile, File(...)]):
 
     try:
         video_path: Path = await asyncio.to_thread(
-            INFER_ENGINE.generate_to_path, payload
+            INFER_ENGINE.generate_to_path,
+            payload,
+            prompt=prompt,
+            infer_steps=steps,
+            guidance_scale=cfg,
+            lora_multiplier=lora_multiplier,
+            total_frames=total_frames,
+            latent_window_size=latent_window_size,
         )
     except InferenceError as exc:
         logger.warning("FramePack inference failed: %s", exc)

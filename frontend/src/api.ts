@@ -14,6 +14,15 @@ export type InferResponse = {
   upload_filename: string;
 };
 
+export type InferOptions = {
+  steps?: number;
+  cfg?: number;
+  loraMultiplier?: number;
+  prompt?: string;
+  totalFrames?: number;
+  latentWindowSize?: number;
+};
+
 async function handleJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const text = await response.text();
@@ -32,9 +41,27 @@ export async function fetchVideos(): Promise<VideoEntry[]> {
   return handleJson<VideoEntry[]>(res);
 }
 
-export async function requestInference(file: File): Promise<InferResponse> {
+export async function requestInference(file: File, options: InferOptions): Promise<InferResponse> {
   const form = new FormData();
   form.append('image', file, file.name);
+  if (typeof options.steps === 'number') {
+    form.append('steps', options.steps.toString());
+  }
+  if (typeof options.cfg === 'number') {
+    form.append('cfg', options.cfg.toString());
+  }
+  if (typeof options.loraMultiplier === 'number') {
+    form.append('lora_multiplier', options.loraMultiplier.toString());
+  }
+  if (options.prompt) {
+    form.append('prompt', options.prompt);
+  }
+  if (typeof options.totalFrames === 'number') {
+    form.append('total_frames', options.totalFrames.toString());
+  }
+  if (typeof options.latentWindowSize === 'number') {
+    form.append('latent_window_size', options.latentWindowSize.toString());
+  }
   const res = await fetch('/api/infer', {
     method: 'POST',
     body: form,

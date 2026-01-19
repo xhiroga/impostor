@@ -131,7 +131,10 @@ class FramePackInference:
         )
 
         settings = GenerationSettings(
-            prompt=os.getenv("IMPOSTOR_PROMPT", "rotating 360 degrees"),
+            prompt=os.getenv(
+                "IMPOSTOR_PROMPT",
+                "360-degree orbit around the subject, camera rising in a spiral.",
+            ),
             video_sections=int(os.getenv("IMPOSTOR_VIDEO_SECTIONS", "4")),
             fps=int(os.getenv("IMPOSTOR_FPS", "30")),
             infer_steps=int(os.getenv("IMPOSTOR_INFER_STEPS", "15")),
@@ -142,11 +145,29 @@ class FramePackInference:
         )
         return cls(model_paths=model_paths, settings=settings)
 
-    def generate_to_path(self, image_bytes: bytes) -> Path:
+    def generate_to_path(
+        self,
+        image_bytes: bytes,
+        *,
+        prompt: str | None = None,
+        infer_steps: int | None = None,
+        guidance_scale: float | None = None,
+        lora_multiplier: float | None = None,
+        total_frames: int | None = None,
+        latent_window_size: int | None = None,
+    ) -> Path:
         resized_bytes = resize_image_to_bucket(
             image_bytes, resolution=self.settings.bucket_resolution
         )
-        video_tensor = self._run_framepack(resized_bytes)
+        video_tensor = self._run_framepack(
+            resized_bytes,
+            prompt=prompt,
+            infer_steps=infer_steps,
+            guidance_scale=guidance_scale,
+            lora_multiplier=lora_multiplier,
+            total_frames=total_frames,
+            latent_window_size=latent_window_size,
+        )
         filename = (
             f"infer_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}.mp4"
         )
@@ -154,17 +175,46 @@ class FramePackInference:
         save_video_tensor(video_tensor, output_path, fps=self.settings.fps)
         return output_path
 
-    def _run_framepack(self, image_bytes: bytes) -> torch.Tensor:
+    def _run_framepack(
+        self,
+        image_bytes: bytes,
+        *,
+        prompt: str | None = None,
+        infer_steps: int | None = None,
+        guidance_scale: float | None = None,
+        lora_multiplier: float | None = None,
+        total_frames: int | None = None,
+        latent_window_size: int | None = None,
+    ) -> torch.Tensor:
+        effective_prompt = prompt or self.settings.prompt
+        effective_infer_steps = infer_steps or self.settings.infer_steps
+        effective_latent_window_size = (
+            latent_window_size or self.settings.latent_window_size
+        )
+        effective_video_sections = self.settings.video_sections
+
+        if total_frames is not None and total_frames > 1:
+            sections = max(
+                int(round((total_frames - 1) / (effective_latent_window_size * 4))), 1
+            )
+            effective_video_sections = sections
+
+        model_paths = asdict(self.model_paths)
+        if lora_multiplier is not None:
+            model_paths["lora_multiplier"] = [lora_multiplier]
+
         video = generate_video(
-            model_paths=asdict(self.model_paths),
-            prompt=self.settings.prompt,
+            model_paths=model_paths,
+            prompt=effective_prompt,
             image_bytes=image_bytes,
-            video_sections=self.settings.video_sections,
+            video_sections=effective_video_sections,
             fps=self.settings.fps,
-            infer_steps=self.settings.infer_steps,
-            latent_window_size=self.settings.latent_window_size,
+            infer_steps=effective_infer_steps,
+            latent_window_size=effective_latent_window_size,
             cache_dir=str(self.settings.cache_dir),
             shared_models=self._shared_models,
+            guidance_scale=guidance_scale,
+            lora_multiplier=lora_multiplier,
         )
         if video is None:
             raise InferenceError("FramePack pipeline returned no video")
@@ -264,6 +314,8 @@ def generate_video(
     latent_window_size: int,
     cache_dir: str,
     shared_models: dict[str, Any],
+    guidance_scale: float | None = None,
+    lora_multiplier: float | None = None,
 ) -> torch.Tensor:
     from musubi_tuner.fpack_generate_video import (
         decode_latent,
@@ -314,6 +366,11 @@ def generate_video(
             shared_models.update(load_shared_models(args))
             shared_models["conds_cache"] = {}
             shared_models["model"] = load_dit_model(args, device)
+            shared_models["lora_multiplier"] = (
+                lora_multiplier
+                if lora_multiplier is not None
+                else (model_paths.get("lora_multiplier") or [1.0])[0]
+            )
             shared_models["vae"] = load_vae(
                 args.vae,
                 args.vae_chunk_size,
@@ -321,6 +378,15 @@ def generate_video(
                 args.vae_tiling,
                 device,
             )
+        elif (
+            lora_multiplier is not None
+            and shared_models.get("lora_multiplier") != lora_multiplier
+        ):
+            shared_models["model"] = load_dit_model(args, device)
+            shared_models["lora_multiplier"] = lora_multiplier
+
+        if guidance_scale is not None:
+            args.guidance_scale = guidance_scale
 
         vae, latent = generate(args, gen_settings, shared_models=shared_models)
         if vae is None:

@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
-import { fetchStatus, fetchVideos, requestInference, type VideoEntry } from './api';
+import { fetchStatus, fetchVideos, requestInference, type InferOptions, type VideoEntry } from './api';
 import { ThreeViewer } from './components/ThreeViewer';
 
 function App() {
@@ -18,6 +18,12 @@ function App() {
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [bgColor, setBgColor] = useState('#f8fafc');
   const [bgEnabled, setBgEnabled] = useState(true);
+  const [inferSteps, setInferSteps] = useState(15);
+  const [cfgScale, setCfgScale] = useState(1.0);
+  const [loraMultiplier, setLoraMultiplier] = useState(1.0);
+  const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
+  const [totalFrames, setTotalFrames] = useState(73);
+  const [latentWindowSize] = useState(9);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +113,15 @@ function App() {
     setIsUploading(true);
     setInferError('');
     try {
-      const result = await requestInference(file);
+      const options: InferOptions = {
+        steps: inferSteps,
+        cfg: cfgScale,
+        loraMultiplier,
+        prompt,
+        totalFrames,
+        latentWindowSize,
+      };
+      const result = await requestInference(file, options);
       setInferMessage(result.message);
       await refreshVideos(result.video.value);
       await refreshStatus();
@@ -167,6 +181,68 @@ function App() {
                 )}
               </div>
             </div>
+            <div className="control-grid">
+              <label className="control-field">
+                Steps
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  step={1}
+                  value={inferSteps}
+                  onChange={(event) => setInferSteps(Number(event.target.value))}
+                  disabled={!engineReady || isUploading}
+                />
+              </label>
+              <label className="control-field">
+                CFG
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  step={0.1}
+                  value={cfgScale}
+                  onChange={(event) => setCfgScale(Number(event.target.value))}
+                  disabled={!engineReady || isUploading}
+                />
+              </label>
+              <label className="control-field">
+                LoRA multiplier
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={loraMultiplier}
+                  onChange={(event) => setLoraMultiplier(Number(event.target.value))}
+                  disabled={!engineReady || isUploading}
+                />
+              </label>
+            </div>
+            <details className="advanced-settings">
+              <summary>詳細設定</summary>
+              <div className="advanced-grid">
+                <label className="control-field">
+                  Prompt
+                  <textarea
+                    rows={3}
+                    value={prompt}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    disabled={!engineReady || isUploading}
+                  />
+                </label>
+                <label className="control-field">
+                  Total Frames
+                  <input type="number" value={totalFrames} disabled />
+                  <span className="field-note">デフォルト 73（ビューア想定）</span>
+                </label>
+                <label className="control-field">
+                  Latent Window Size
+                  <input type="number" value={latentWindowSize} disabled />
+                  <span className="field-note">デフォルト 9（固定）</span>
+                </label>
+              </div>
+            </details>
             <button className="cta" type="submit" disabled={!file || !engineReady || isUploading}>
               {isUploading ? '推論中...' : '推論スタート'}
             </button>
@@ -196,38 +272,41 @@ function App() {
             </select>
           </label>
           <div className="color-row">
-            <label className="color-field">
-              中央色
-              <div className="color-inputs">
-                <input
-                  className="color-picker"
-                  type="color"
-                  value={bgColor}
-                  onChange={(event) => {
-                    setBgColor(event.target.value);
-                    setBgEnabled(true);
-                  }}
-                  disabled={!engineReady || isUploading}
-                />
-                <input
-                  className={`color-code${bgEnabled ? '' : ' is-muted'}`}
-                  type="text"
-                  value={bgEnabled ? bgColor.toUpperCase() : '未選択'}
-                  readOnly
-                />
+            <div className="color-row-head">
+              <label className="color-label" htmlFor="chroma-key-color">
+                クロマキー
+              </label>
+              <div className="color-actions">
+                {bgEnabled && (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setBgEnabled(false)}
+                    aria-label="背景色選択をクリア"
+                  >
+                    クリア
+                  </button>
+                )}
               </div>
-            </label>
-            <div className="color-actions">
-              {bgEnabled && (
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => setBgEnabled(false)}
-                  aria-label="背景色選択をクリア"
-                >
-                  クリア
-                </button>
-              )}
+            </div>
+            <div className="color-inputs">
+              <input
+                id="chroma-key-color"
+                className="color-picker"
+                type="color"
+                value={bgColor}
+                onChange={(event) => {
+                  setBgColor(event.target.value);
+                  setBgEnabled(true);
+                }}
+                disabled={!engineReady || isUploading}
+              />
+              <input
+                className={`color-code${bgEnabled ? '' : ' is-muted'}`}
+                type="text"
+                value={bgEnabled ? bgColor.toUpperCase() : '未選択'}
+                readOnly
+              />
             </div>
           </div>
           {loadingVideos && <p className="muted" style={{ fontSize: '0.85rem' }}>動画リストを更新中...</p>}
