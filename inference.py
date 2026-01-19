@@ -104,6 +104,7 @@ class FramePackInference:
     def __init__(self, model_paths: ModelPaths, settings: GenerationSettings):
         self.model_paths = model_paths
         self.settings = settings
+        self._shared_models: dict[str, Any] = {}
 
     @classmethod
     def from_env(cls) -> Self:
@@ -163,6 +164,7 @@ class FramePackInference:
             infer_steps=self.settings.infer_steps,
             latent_window_size=self.settings.latent_window_size,
             cache_dir=str(self.settings.cache_dir),
+            shared_models=self._shared_models,
         )
         if video is None:
             raise InferenceError("FramePack pipeline returned no video")
@@ -261,12 +263,16 @@ def generate_video(
     infer_steps: int,
     latent_window_size: int,
     cache_dir: str,
+    shared_models: dict[str, Any],
 ) -> torch.Tensor:
     from musubi_tuner.fpack_generate_video import (
         decode_latent,
         generate,
         get_generation_settings,
+        load_dit_model,
+        load_shared_models,
     )
+    from musubi_tuner.frame_pack.framepack_utils import load_vae
 
     cache_root = Path(cache_dir)
     cache_root.mkdir(parents=True, exist_ok=True)
@@ -302,7 +308,21 @@ def generate_video(
         )
 
         gen_settings = get_generation_settings(args)
-        vae, latent = generate(args, gen_settings)
+        device = gen_settings.device
+
+        if not shared_models:
+            shared_models.update(load_shared_models(args))
+            shared_models["conds_cache"] = {}
+            shared_models["model"] = load_dit_model(args, device)
+            shared_models["vae"] = load_vae(
+                args.vae,
+                args.vae_chunk_size,
+                args.vae_spatial_tile_sample_min_size,
+                args.vae_tiling,
+                device,
+            )
+
+        vae, latent = generate(args, gen_settings, shared_models=shared_models)
         if vae is None:
             raise InferenceError("VAE was None after generation")
 
@@ -310,8 +330,6 @@ def generate_video(
             args.latent_window_size * 4
         )
         total_latent_sections = int(max(round(total_latent_sections), 1))
-        device = torch.device("cuda")
-
         video = decode_latent(
             args.latent_window_size,
             total_latent_sections,

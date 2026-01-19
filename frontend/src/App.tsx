@@ -121,7 +121,6 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-head">
-        <p className="eyebrow">FastAPI × React</p>
         <h1>Impostor Maker</h1>
         <p className="lead">単一の画像から軽量な偽の3Dモデルを生成します。裏側で動画生成モデルを使用。</p>
       </header>
