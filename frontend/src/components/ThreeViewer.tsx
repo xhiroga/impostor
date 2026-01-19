@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-const FRAME_COUNT = 81;
+const FRAME_COUNT = 73;
 const PITCH_BANDS = [
-  { min: 0, max: 18, offset: 0 },
-  { min: 18, max: 36, offset: 16 },
-  { min: 36, max: 54, offset: 32 },
-  { min: 54, max: 72, offset: 48 },
-  { min: 72, max: 91, offset: 64 },
+  { min: 0, max: 22.5, offset: 0 },
+  { min: 22.5, max: 45, offset: 18 },
+  { min: 45, max: 67.5, offset: 36 },
+  { min: 67.5, max: 91, offset: 54 },
 ];
 const PANEL_BASE_SIZE = 1.2;
 
@@ -96,32 +95,27 @@ const inferBackgroundColor = (ctx: CanvasRenderingContext2D, width: number, heig
   const samples = coords.map(([x, y]) =>
     sampleRegionColor(ctx, Math.max(0, x), Math.max(0, y), sampleSize, sampleSize),
   );
-  const buckets = new Map<string, { count: number; r: number; g: number; b: number }>();
+  const buckets = new Map<string, number>();
   for (const sample of samples) {
     const qr = quantizeChannel(sample.r);
     const qg = quantizeChannel(sample.g);
     const qb = quantizeChannel(sample.b);
     const key = `${qr},${qg},${qb}`;
-    const current = buckets.get(key);
-    if (current) {
-      current.count += 1;
-      current.r += sample.r;
-      current.g += sample.g;
-      current.b += sample.b;
-    } else {
-      buckets.set(key, { count: 1, r: sample.r, g: sample.g, b: sample.b });
+    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+  let winnerKey: string | null = null;
+  let winnerCount = -1;
+  for (const [key, count] of Array.from(buckets.entries())) {
+    if (count > winnerCount) {
+      winnerKey = key;
+      winnerCount = count;
     }
   }
-  let winner: { count: number; r: number; g: number; b: number } | null = null;
-  for (const bucket of Array.from(buckets.values())) {
-    if (!winner || bucket.count > winner.count) {
-      winner = bucket;
-    }
-  }
-  if (!winner) {
+  if (!winnerKey) {
     return '#ffffff';
   }
-  return toHexColor(winner.r / winner.count, winner.g / winner.count, winner.b / winner.count);
+  const [r, g, b] = winnerKey.split(',').map((value) => Number.parseInt(value, 10));
+  return toHexColor(r, g, b);
 };
 
 const applyChromaKey = (
@@ -212,9 +206,9 @@ export function ThreeViewer({
   };
 
   const mapAnglesToFrame = (yaw: number, pitch: number) => {
-    const yawStep = 360 / 16;
+    const yawStep = 360 / 18;
     const yawReversed = (360 - yaw) % 360;
-    const yawIndex = Math.floor(((yawReversed % 360) + yawStep / 2) / yawStep) % 16;
+    const yawIndex = Math.floor(((yawReversed % 360) + yawStep / 2) / yawStep) % 18;
     const band =
       PITCH_BANDS.find((segment) => pitch >= segment.min && pitch < segment.max) ?? PITCH_BANDS[PITCH_BANDS.length - 1];
     return Math.min(band.offset + yawIndex, FRAME_COUNT - 1);
