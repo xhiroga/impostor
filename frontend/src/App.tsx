@@ -16,6 +16,8 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [loadingVideos, setLoadingVideos] = useState(false);
+  const [bgColor, setBgColor] = useState('#f8fafc');
+  const [bgEnabled, setBgEnabled] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,6 +120,11 @@ function App() {
     }
   };
 
+  const handleAutoBgColor = useCallback((color: string) => {
+    setBgColor(color);
+    setBgEnabled(true);
+  }, []);
+
   return (
     <div className="app-shell">
       <header className="app-head">
@@ -188,10 +195,51 @@ function App() {
               ))}
             </select>
           </label>
+          <div className="color-row">
+            <label className="color-field">
+              背景色
+              <div className="color-inputs">
+                <input
+                  className="color-picker"
+                  type="color"
+                  value={bgColor}
+                  onChange={(event) => {
+                    setBgColor(event.target.value);
+                    setBgEnabled(true);
+                  }}
+                  disabled={!engineReady || isUploading}
+                />
+                <input
+                  className={`color-code${bgEnabled ? '' : ' is-muted'}`}
+                  type="text"
+                  value={bgEnabled ? bgColor.toUpperCase() : '未選択'}
+                  readOnly
+                />
+              </div>
+            </label>
+            <div className="color-actions">
+              {bgEnabled && (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => setBgEnabled(false)}
+                  aria-label="背景色選択をクリア"
+                >
+                  クリア
+                </button>
+              )}
+            </div>
+          </div>
           {loadingVideos && <p className="muted" style={{ fontSize: '0.85rem' }}>動画リストを更新中...</p>}
           {videoError && <p className="error-text">{videoError}</p>}
           <div className="viewer-shell">
-            <ThreeViewer videoPath={selectedVideo || undefined} onAnglesChange={setViewerAngles} />
+            <ThreeViewer
+              videoPath={selectedVideo || undefined}
+              chromaKey={bgEnabled ? { color: bgColor, threshold: 0.12, softness: 0.1 } : undefined}
+              showFloor
+              onAnglesChange={setViewerAngles}
+              onAutoKeyColor={handleAutoBgColor}
+            />
           </div>
           <p className="status-text">{viewerAngles}</p>
         </section>

@@ -12,9 +12,19 @@ const PITCH_BANDS = [
 ];
 const PANEL_BASE_SIZE = 1.2;
 
+export type ChromaKeySettings = {
+  color: string;
+  threshold?: number;
+  softness?: number;
+};
+
 export type ThreeViewerProps = {
   videoPath?: string;
   onAnglesChange?: (text: string) => void;
+  chromaKey?: ChromaKeySettings;
+  transparentBackground?: boolean;
+  showFloor?: boolean;
+  onAutoKeyColor?: (color: string) => void;
 };
 
 type ViewerState = {
@@ -29,9 +39,101 @@ type ViewerState = {
   textureCtx?: CanvasRenderingContext2D | null;
   frameBitmaps: ImageBitmap[];
   panelDimensions: { width: number; height: number };
+  keyEnabled?: boolean;
+  autoSampledFor?: string;
 };
 
-export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
+const parseHexColor = (value: string) => {
+  const hex = value.replace('#', '').trim();
+  if (hex.length !== 6) {
+    return { r: 255, g: 255, b: 255 };
+  }
+  const num = Number.parseInt(hex, 16);
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+};
+
+const clampByte = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
+
+const toHexColor = (r: number, g: number, b: number) => {
+  const toHex = (value: number) => clampByte(value).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
+const sampleRegionColor = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) => {
+  const data = ctx.getImageData(x, y, width, height).data;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+    count += 1;
+  }
+  if (!count) return { r: 255, g: 255, b: 255 };
+  return { r: r / count, g: g / count, b: b / count };
+};
+
+const inferBackgroundColor = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const sampleSize = Math.max(4, Math.floor(Math.min(width, height) * 0.08));
+  const samples = [
+    sampleRegionColor(ctx, 0, 0, sampleSize, sampleSize),
+    sampleRegionColor(ctx, width - sampleSize, 0, sampleSize, sampleSize),
+    sampleRegionColor(ctx, 0, height - sampleSize, sampleSize, sampleSize),
+    sampleRegionColor(ctx, width - sampleSize, height - sampleSize, sampleSize, sampleSize),
+  ];
+  const avg = samples.reduce(
+    (acc, sample) => ({
+      r: acc.r + sample.r / samples.length,
+      g: acc.g + sample.g / samples.length,
+      b: acc.b + sample.b / samples.length,
+    }),
+    { r: 0, g: 0, b: 0 },
+  );
+  return toHexColor(avg.r, avg.g, avg.b);
+};
+
+const applyChromaKey = (
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  key: ChromaKeySettings,
+) => {
+  const { r: keyR, g: keyG, b: keyB } = parseHexColor(key.color);
+  const threshold = Math.max(0, Math.min(1, key.threshold ?? 0.12));
+  const softness = Math.max(0, Math.min(1, key.softness ?? 0.08));
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const maxDistance = Math.sqrt(3 * 255 * 255);
+  for (let i = 0; i < data.length; i += 4) {
+    const dr = data[i] - keyR;
+    const dg = data[i + 1] - keyG;
+    const db = data[i + 2] - keyB;
+    const distance = Math.sqrt(dr * dr + dg * dg + db * db) / maxDistance;
+    let alpha = 1;
+    if (distance <= threshold) {
+      alpha = 0;
+    } else if (softness > 0) {
+      alpha = Math.min(1, (distance - threshold) / softness);
+    }
+    data[i + 3] = Math.round(data[i + 3] * alpha);
+  }
+  ctx.putImageData(imageData, 0, 0);
+};
+
+export function ThreeViewer({
+  videoPath,
+  onAnglesChange,
+  chromaKey,
+  transparentBackground,
+  showFloor = true,
+  onAutoKeyColor,
+}: ThreeViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<ViewerState>({
     frameBitmaps: [],
@@ -66,6 +168,7 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
       return;
     }
     const frame = state.frameBitmaps[Math.min(index, state.frameBitmaps.length - 1)];
+    state.textureCtx.clearRect(0, 0, state.textureCanvas.width, state.textureCanvas.height);
     state.textureCtx.drawImage(frame, 0, 0, state.textureCanvas.width, state.textureCanvas.height);
     state.texture.needsUpdate = true;
   };
@@ -119,7 +222,12 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
       state.panelMesh.material.dispose();
     }
     const geometry = new THREE.PlaneGeometry(state.panelDimensions.width, state.panelDimensions.height);
-    const material = new THREE.MeshBasicMaterial({ map: state.texture, side: THREE.DoubleSide });
+    const material = new THREE.MeshBasicMaterial({
+      map: state.texture,
+      side: THREE.DoubleSide,
+      transparent: Boolean(state.keyEnabled),
+      alphaTest: state.keyEnabled ? 0.02 : 0,
+    });
     state.panelMesh = new THREE.Mesh(geometry, material);
     state.panelMesh.position.y = -0.4;
     state.scene.add(state.panelMesh);
@@ -269,6 +377,10 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
     const duration = video.duration || 0;
     const maxTime = duration > 0 ? duration - 0.0001 : 0;
     const frameTimes = Array.from({ length: FRAME_COUNT }, (_, i) => Math.min((i / (FRAME_COUNT - 1)) * duration, maxTime));
+    const keySettings = chromaKey?.color ? chromaKey : undefined;
+    state.keyEnabled = Boolean(keySettings);
+    const shouldAutoSample = Boolean(onAutoKeyColor) && state.autoSampledFor !== path;
+    let didAutoSample = false;
 
     for (const time of frameTimes) {
       await seekVideo(video, time, isCancelled);
@@ -276,6 +388,15 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
       if (isCancelled()) return;
       captureCtx.clearRect(0, 0, videoWidth, videoHeight);
       captureCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, videoWidth, videoHeight);
+      if (!didAutoSample && shouldAutoSample && onAutoKeyColor) {
+        const inferred = inferBackgroundColor(captureCtx, videoWidth, videoHeight);
+        onAutoKeyColor(inferred);
+        didAutoSample = true;
+        state.autoSampledFor = path;
+      }
+      if (keySettings) {
+        applyChromaKey(captureCtx, videoWidth, videoHeight, keySettings);
+      }
       let bitmap: ImageBitmap;
       try {
         bitmap = await window.createImageBitmap(captureCanvas);
@@ -298,6 +419,7 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
       state.texture.dispose();
     }
     state.texture = new THREE.CanvasTexture(state.textureCanvas);
+    state.texture.premultiplyAlpha = Boolean(keySettings);
     state.texture.colorSpace = THREE.SRGBColorSpace;
     rebuildPanelMesh();
     updatePanelDimensions(captureCanvas.width, captureCanvas.height);
@@ -318,11 +440,16 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
     const width = container.clientWidth || 960;
     const height = container.clientHeight || width * (9 / 16);
     renderer.setSize(width, height);
+    if (transparentBackground) {
+      renderer.setClearColor(0x000000, 0);
+    }
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#ffffff');
+    if (!transparentBackground) {
+      scene.background = new THREE.Color('#ffffff');
+    }
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 1, 2.4);
@@ -360,14 +487,18 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
 
     rebuildPanelMesh();
 
-    const floorGeometry = new THREE.PlaneGeometry(6, 6);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.05, roughness: 0.9 });
-    const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.y = -1;
-    scene.add(floorMesh);
-    state.floorMesh = floorMesh;
-    applyFloorTextures();
+    let floorGeometry: THREE.PlaneGeometry | null = null;
+    let floorMaterial: THREE.MeshStandardMaterial | null = null;
+    if (showFloor) {
+      floorGeometry = new THREE.PlaneGeometry(6, 6);
+      floorMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.05, roughness: 0.9 });
+      const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+      floorMesh.rotation.x = -Math.PI / 2;
+      floorMesh.position.y = -1;
+      scene.add(floorMesh);
+      state.floorMesh = floorMesh;
+      applyFloorTextures();
+    }
 
     const onResize = () => handleResize();
     window.addEventListener('resize', onResize);
@@ -392,8 +523,8 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
       cleanupFrames();
       renderer.dispose();
       texture.dispose();
-      floorGeometry.dispose();
-      floorMaterial.dispose();
+      floorGeometry?.dispose();
+      floorMaterial?.dispose();
       if (state.panelMesh) {
         state.panelMesh.geometry.dispose();
         state.panelMesh.material.dispose();
@@ -434,7 +565,14 @@ export function ThreeViewer({ videoPath, onAnglesChange }: ThreeViewerProps) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoPath, ready]);
+  }, [
+    videoPath,
+    ready,
+    chromaKey?.color,
+    chromaKey?.threshold,
+    chromaKey?.softness,
+    onAutoKeyColor,
+  ]);
 
   return <div className="three-viewer" ref={containerRef} />;
 }
