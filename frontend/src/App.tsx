@@ -197,7 +197,7 @@ function App() {
           </label>
           <div className="color-row">
             <label className="color-field">
-              背景色
+              中央色
               <div className="color-inputs">
                 <input
                   className="color-picker"
@@ -235,7 +235,7 @@ function App() {
           <div className="viewer-shell">
             <ThreeViewer
               videoPath={selectedVideo || undefined}
-              chromaKey={bgEnabled ? { color: bgColor, threshold: 0.12, softness: 0.1 } : undefined}
+              chromaKey={bgEnabled ? { color: bgColor, threshold: 0.08, softness: 0.08 } : undefined}
               showFloor
               onAnglesChange={setViewerAngles}
               onAutoKeyColor={handleAutoBgColor}

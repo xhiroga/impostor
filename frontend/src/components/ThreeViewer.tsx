@@ -79,23 +79,49 @@ const sampleRegionColor = (ctx: CanvasRenderingContext2D, x: number, y: number, 
   return { r: r / count, g: g / count, b: b / count };
 };
 
+const quantizeChannel = (value: number) => clampByte(Math.round(value / 16) * 16);
+
 const inferBackgroundColor = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-  const sampleSize = Math.max(4, Math.floor(Math.min(width, height) * 0.08));
-  const samples = [
-    sampleRegionColor(ctx, 0, 0, sampleSize, sampleSize),
-    sampleRegionColor(ctx, width - sampleSize, 0, sampleSize, sampleSize),
-    sampleRegionColor(ctx, 0, height - sampleSize, sampleSize, sampleSize),
-    sampleRegionColor(ctx, width - sampleSize, height - sampleSize, sampleSize, sampleSize),
+  const sampleSize = Math.max(6, Math.floor(Math.min(width, height) * 0.12));
+  const coords = [
+    [0, 0],
+    [width - sampleSize, 0],
+    [0, height - sampleSize],
+    [width - sampleSize, height - sampleSize],
+    [Math.floor((width - sampleSize) / 2), 0],
+    [Math.floor((width - sampleSize) / 2), height - sampleSize],
+    [0, Math.floor((height - sampleSize) / 2)],
+    [width - sampleSize, Math.floor((height - sampleSize) / 2)],
   ];
-  const avg = samples.reduce(
-    (acc, sample) => ({
-      r: acc.r + sample.r / samples.length,
-      g: acc.g + sample.g / samples.length,
-      b: acc.b + sample.b / samples.length,
-    }),
-    { r: 0, g: 0, b: 0 },
+  const samples = coords.map(([x, y]) =>
+    sampleRegionColor(ctx, Math.max(0, x), Math.max(0, y), sampleSize, sampleSize),
   );
-  return toHexColor(avg.r, avg.g, avg.b);
+  const buckets = new Map<string, { count: number; r: number; g: number; b: number }>();
+  for (const sample of samples) {
+    const qr = quantizeChannel(sample.r);
+    const qg = quantizeChannel(sample.g);
+    const qb = quantizeChannel(sample.b);
+    const key = `${qr},${qg},${qb}`;
+    const current = buckets.get(key);
+    if (current) {
+      current.count += 1;
+      current.r += sample.r;
+      current.g += sample.g;
+      current.b += sample.b;
+    } else {
+      buckets.set(key, { count: 1, r: sample.r, g: sample.g, b: sample.b });
+    }
+  }
+  let winner: { count: number; r: number; g: number; b: number } | null = null;
+  for (const bucket of Array.from(buckets.values())) {
+    if (!winner || bucket.count > winner.count) {
+      winner = bucket;
+    }
+  }
+  if (!winner) {
+    return '#ffffff';
+  }
+  return toHexColor(winner.r / winner.count, winner.g / winner.count, winner.b / winner.count);
 };
 
 const applyChromaKey = (
