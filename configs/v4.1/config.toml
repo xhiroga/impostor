@@ -1,0 +1,75 @@
+dit = "/workspace/models/diffusion_models/FramePackI2V_HY/diffusion_pytorch_model-00001-of-00003.safetensors"
+vae = "/workspace/models/vae/diffusion_pytorch_model.safetensors"
+text_encoder1 = "/workspace/models/text_encoders/model-00001-of-00004.safetensors"
+text_encoder2 = "/workspace/models/text_encoder_2/model.safetensors"
+image_encoder = "/workspace/models/image_encoder/model.safetensors"
+dataset_config = "/workspace/impostor/configs/v4/dataset.toml"
+
+# hv_train_network.NetworkTrainer#train で参照されるオプション
+fp8_base = true
+fp8_scaled = true
+
+blocks_to_swap = 20
+split_attn = true
+img_in_txt_in_offloading = true
+
+seed = 42
+mixed_precision = "bf16"
+# full_fp16, full_bf16 も指定可能
+# dtype 関連オプション...
+
+sdpa = true
+# flash_attn = true   # または --sdpa, --xformers, --flash_attn
+network_module = "networks.lora_framepack"
+
+# dim/alpha = 8/8 だと過学習に終わったので引き上げる
+network_dim = 32
+network_alpha = 16
+
+optimizer_type = "adamw8bit"
+learning_rate = 2e-4
+# L40S (VRAM 48GB)のうち32GB程度しか使っていないようなので、gradient_checkpointing = false でも問題ないかもしれない
+# しかし速度がそこまで上がると思えないのでtrueのままで
+gradient_checkpointing = true
+max_data_loader_n_workers = 2
+persistent_data_loader_workers = true
+# どうせ途中で止めるので...
+max_train_steps = 5000
+
+timestep_sampling = "shift"
+discrete_flow_shift = 7.0
+# データセットのサイズを変更して試しているので steps数指定の方が良い
+# Storageがいっぱいになってきた...
+save_every_n_steps = 500
+
+# 途中から学習再開できるように（初めから有効にしたかった...）
+save_state = true
+save_state_on_train_end = true
+
+f1 = false
+
+output_dir = "output"
+output_name = "impostor-v4.1"
+log_with = "wandb"
+log_tracker_name = "impostor"
+log_config = true
+
+huggingface_repo_id = "sawara-dev/impostor-models"
+huggingface_repo_type = "model"
+huggingface_path_in_repo = "/"
+save_state_to_huggingface = true
+
+# Sampling options
+sample_at_first = true
+sample_every_n_steps = 100
+sample_prompts = "/workspace/impostor/configs/v4/prompts.txt"
+
+fp8_llm = true
+vae_chunk_size = 32
+vae_spatial_tile_sample_min_size = 128
+
+vae_dtype = "float16"
+dit_dtype = "bfloat16"
+sample_solver = "unipc"
+
+resume = /workspace/impostor/output/impostor-v4-step00001200-state
