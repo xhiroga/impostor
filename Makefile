@@ -5,8 +5,6 @@ MODEL_PATH ?= /workspace/models
 # クラウドの場合はマウントしているボリューム配下のパスにすること
 TMP ?= /workspace/tmp
 
-LORA_DIR ?= impostor-v2-step00000800-state
-
 .ONESHELL:
 .PHONY: train cache models wan_train wan_cache wan_models run-comfyui frontend-build demo
 
@@ -25,7 +23,6 @@ models = \
 	$(MODEL_PATH)/text_encoders/model-00004-of-00004.safetensors \
 	$(MODEL_PATH)/text_encoder_2/model.safetensors \
 	$(MODEL_PATH)/image_encoder/model.safetensors \
-	$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors \
 	$(MODEL_PATH)/text_encoders/clip_l.safetensors \
 	$(MODEL_PATH)/text_encoders/llava_llama3_fp8_scaled.safetensors \
 	$(MODEL_PATH)/clip_vision/sigclip_vision_patch14_384.safetensors \
@@ -61,9 +58,6 @@ $(MODEL_PATH)/text_encoder_2/model.safetensors: FILE=text_encoder_2/model.safete
 
 $(MODEL_PATH)/image_encoder/model.safetensors: REPO=lllyasviel/flux_redux_bfl
 $(MODEL_PATH)/image_encoder/model.safetensors: FILE=image_encoder/model.safetensors
-
-$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: REPO=sawara-dev/impostor-models
-$(MODEL_PATH)/loras/$(LORA_DIR)/model.safetensors: FILE=$(LORA_DIR)/model.safetensors
 
 ## for ComfyUI
 $(MODEL_PATH)/text_encoders/clip_l.safetensors: REPO=Comfy-Org/HunyuanVideo_repackaged
