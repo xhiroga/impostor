@@ -276,3 +276,6 @@ frontend-build:
 
 demo: frontend-build
 	uv run fastapi dev main.py
+
+eval:
+	uv run --extra eval evaluation/main.py --video $(video)
