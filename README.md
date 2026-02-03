@@ -17,7 +17,6 @@ cd /workspace
 mkdir -p models
 mkdir -p tmp
 git clone https://huggingface.co/datasets/sawara-dev/impostor-data
-git clone https://huggingface.co/datasets/xhiroga/data
 git clone https://github.com/xhiroga/impostor
 cd impostor
 uv pip install hatchling
