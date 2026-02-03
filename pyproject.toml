@@ -21,6 +21,12 @@ dependencies = [
     "diffsynth",
 ]
 
+[project.optional-dependencies]
+eval = [
+    "open_clip_torch",
+    "lpips",
+]
+
 [dependency-groups]
 dev = [
     "ruff>=0.14.10",
