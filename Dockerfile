@@ -18,6 +18,6 @@ COPY config.py ./
 COPY frontend/build ./frontend/build
 
 ENV PYTHONUNBUFFERED=1
-EXPOSE 8000
+EXPOSE 8080
 
-CMD ["uv", "run", "fastapi", "run", "main.py"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
