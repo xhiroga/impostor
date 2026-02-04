@@ -274,6 +274,14 @@ run-comfyui:
 frontend-build:
 	cd frontend && pnpm install && pnpm run build
 
+configure-bucket:
+	@AWS_ACCESS_KEY_ID="$(CLOUDFLARE_R2_ACCESS_KEY_ID)" \
+	AWS_SECRET_ACCESS_KEY="$(CLOUDFLARE_R2_SECRET_ACCESS_KEY)" \
+	aws s3api put-bucket-lifecycle-configuration \
+		--endpoint-url "$(CLOUDFLARE_R2_S3_API)" \
+		--bucket "$(CLOUDFLARE_R2_BUCKET)" \
+		--lifecycle-configuration "Rules=[{ID=impostor-expire-30d,Status=Enabled,Expiration={Days=30}}]"
+
 demo: frontend-build
 	uv run --extra gpu fastapi dev main.py
 
