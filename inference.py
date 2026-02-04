@@ -1,6 +1,6 @@
 import io
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -10,32 +10,11 @@ import torch
 import torchvision
 from PIL import Image
 
+from config import GenerationSettings, ModelPaths
+
 
 class InferenceError(Exception):
     """Raised when FramePack inference fails."""
-
-
-@dataclass(slots=True)
-class ModelPaths:
-    dit: str
-    vae: str
-    text_encoder1: str
-    text_encoder2: str
-    image_encoder: str
-    lora_weight: list[str] | None = None
-    lora_multiplier: list[float] | None = None
-
-
-@dataclass(slots=True)
-class GenerationSettings:
-    prompt: str
-    video_sections: int
-    fps: int
-    infer_steps: int
-    latent_window_size: int
-    cache_dir: Path
-    output_dir: Path
-    bucket_resolution: int = 640
 
 
 BUCKET_OPTIONS: dict[int, list[tuple[int, int]]] = {
@@ -155,7 +134,7 @@ class FramePackInference:
 
         if total_frames is not None and total_frames > 1:
             sections = max(
-                int(round((total_frames - 1) / (effective_latent_window_size * 4))), 1
+                round((total_frames - 1) / (effective_latent_window_size * 4)), 1
             )
             effective_video_sections = sections
 

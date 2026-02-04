@@ -118,11 +118,10 @@ def _upload(volume: modal.Volume, targets: list[tuple[Path, PurePosixPath]]) -> 
     if not pending:
         print("already uploaded")
         return
-    with modal.enable_output():
-        with volume.batch_upload(force=True) as batch:
-            for local, remote in pending:
-                print(f"upload {local} -> {remote}")
-                batch.put_file(local, remote.as_posix())
+    with modal.enable_output(), volume.batch_upload(force=True) as batch:
+        for local, remote in pending:
+            print(f"upload {local} -> {remote}")
+            batch.put_file(local, remote.as_posix())
     logger.debug("upload completed")
 
 

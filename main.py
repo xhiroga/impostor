@@ -1,26 +1,28 @@
 import asyncio
 import base64
+import json
 import logging
 import os
-import json
 import socket
-from urllib import error as urllib_error, request as urllib_request
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
-import modal
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from inference import (
-    FramePackInference,
-    GenerationSettings,
-    InferenceError,
-    ModelPaths,
-)
+from config import GenerationSettings, ModelPaths
+
+FramePackInference = Any  # type: ignore
+
+
+class InferenceError(Exception):
+    pass
+
 
 load_dotenv()
 
@@ -104,8 +106,13 @@ def _modal_web_url() -> str:
     )
     if override:
         return override
-    app_name = os.getenv("IMPOSTOR_MODAL_APP_NAME", MODAL_APP_NAME).strip() or MODAL_APP_NAME
-    function_name = os.getenv("IMPOSTOR_MODAL_FUNCTION_NAME", MODAL_FUNCTION_NAME).strip() or MODAL_FUNCTION_NAME
+    app_name = (
+        os.getenv("IMPOSTOR_MODAL_APP_NAME", MODAL_APP_NAME).strip() or MODAL_APP_NAME
+    )
+    function_name = (
+        os.getenv("IMPOSTOR_MODAL_FUNCTION_NAME", MODAL_FUNCTION_NAME).strip()
+        or MODAL_FUNCTION_NAME
+    )
     return f"https://{_modal_workspace()}--{_slug(app_name)}-{_slug(function_name)}.modal.run"
 
 
@@ -122,6 +129,15 @@ def _resolve_path(value: str) -> str:
 
 
 def build_infer_engine_from_env() -> FramePackInference:
+    global InferenceError
+    from inference import (  # local-only import to avoid heavy deps in modal execution
+        FramePackInference as _FramePackInference,
+    )
+    from inference import (
+        InferenceError as _InferenceError,
+    )
+
+    InferenceError = _InferenceError
     model_paths = ModelPaths(
         dit=_resolve_path(_require_env("IMPOSTOR_DIT_PATH")),
         vae=_resolve_path(_require_env("IMPOSTOR_VAE_PATH")),
@@ -146,7 +162,7 @@ def build_infer_engine_from_env() -> FramePackInference:
         output_dir=Path(_resolve_path(os.getenv("IMPOSTOR_OUTPUT_DIR", "output"))),
         bucket_resolution=int(os.getenv("IMPOSTOR_BUCKET_RES", "640")),
     )
-    return FramePackInference(model_paths=model_paths, settings=settings)
+    return _FramePackInference(model_paths=model_paths, settings=settings)
 
 
 def _get_infer_engine() -> FramePackInference | None:
@@ -204,12 +220,16 @@ def _run_modal_inference(
 
     request = urllib_request.Request(
         web_url,
-        data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+        data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
+            "utf-8"
+        ),
         headers=headers,
         method="POST",
     )
     try:
-        timeout = float(os.getenv("IMPOSTOR_MODAL_TIMEOUT_SECONDS", str(MODAL_TIMEOUT_SECONDS)))
+        timeout = float(
+            os.getenv("IMPOSTOR_MODAL_TIMEOUT_SECONDS", str(MODAL_TIMEOUT_SECONDS))
+        )
         with urllib_request.urlopen(request, timeout=timeout) as response:
             charset = response.headers.get_content_charset() or "utf-8"
             response_body = response.read()
@@ -252,6 +272,7 @@ for mount_path, directory in (
             mount_path, StaticFiles(directory=directory), name=mount_path.strip("/")
         )
 
+
 @app.get("/api/videos")
 async def list_videos():
     return _list_videos()
@@ -262,7 +283,9 @@ async def app_status():
     if _execution_mode() == "local":
         _get_infer_engine()
     return {
-        "infer_ready": True if _execution_mode() == "modal" else INFER_ENGINE is not None,
+        "infer_ready": True
+        if _execution_mode() == "modal"
+        else INFER_ENGINE is not None,
         "infer_error": None if _execution_mode() == "modal" else INFER_ENGINE_ERROR,
     }
 
@@ -277,10 +300,7 @@ async def run_inference(
     total_frames: Annotated[int | None, Form()] = None,
     latent_window_size: Annotated[int | None, Form()] = None,
 ):
-    if _execution_mode() == "local":
-        infer_engine = _get_infer_engine()
-    else:
-        infer_engine = None
+    infer_engine = _get_infer_engine() if _execution_mode() == "local" else None
     if infer_engine is None and _execution_mode() == "local":
         raise HTTPException(
             status_code=503,
@@ -355,4 +375,6 @@ else:
 
     @app.get("/", response_class=HTMLResponse)
     async def frontend_placeholder():
-        return HTMLResponse("<h1>Frontend build not found. Run npm run build in frontend/.</h1>")
+        return HTMLResponse(
+            "<h1>Frontend build not found. Run npm run build in frontend/.</h1>"
+        )
