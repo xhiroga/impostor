@@ -22,7 +22,7 @@ function App() {
   const [cfgScale, setCfgScale] = useState(1.0);
   const [loraMultiplier, setLoraMultiplier] = useState(1.0);
   const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
-  const [totalFrames, setTotalFrames] = useState(73);
+  const [totalFrames] = useState(73);
   const [latentWindowSize] = useState(9);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
