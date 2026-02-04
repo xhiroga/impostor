@@ -303,7 +303,7 @@ function App() {
               {isUploading ? '推論中...' : '推論開始（約3分）'}
             </button>
             <p className="muted note-text" style={{ textAlign: 'center' }}>
-              サーバーに送信された画像・動画は、30日後に削除されます。
+              サーバーに送信された画像・動画は、30日間で自動的に削除されます。
             </p>
           </form>
           {inferMessage && <p className="success-text">{inferMessage}</p>}
@@ -428,6 +428,7 @@ function App() {
             <img src="/images/github-mark.svg" alt="GitHub" className="footer-github" />
           </a>
         </div>
+        <p className="footer-note">アクセス解析にGoogle Analyticsを使用しています。</p>
       </footer>
     </div>
   );

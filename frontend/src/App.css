@@ -363,8 +363,11 @@ button.cta:not(:disabled):hover {
 
 .app-footer {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.25rem 0 0.75rem;
+  color: var(--muted);
 }
 
 .footer-content {
@@ -372,7 +375,6 @@ button.cta:not(:disabled):hover {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
-  color: var(--muted);
 }
 
 .footer-link {
@@ -397,4 +399,10 @@ button.cta:not(:disabled):hover {
   width: 20px;
   height: 20px;
   display: block;
+}
+
+.footer-note {
+  font-size: 0.7rem;
+  margin: 0;
+  text-align: center;
 }
