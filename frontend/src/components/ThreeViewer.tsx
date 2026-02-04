@@ -258,7 +258,7 @@ export function ThreeViewer({
     if (!state.floorMesh) return;
     const loader = new THREE.TextureLoader();
     loader.load(
-      '/assets/green-grass.png',
+      '/images/green-grass.png',
       (ground) => {
         ground.wrapS = THREE.MirroredRepeatWrapping;
         ground.wrapT = THREE.MirroredRepeatWrapping;

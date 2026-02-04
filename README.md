@@ -30,6 +30,6 @@ make train
 ## Deploy
 
 ```sh
-uv --directory packages/modal_app run --env-file $(git rev-parse --show-toplevel)/.env setup_modal.py   # モデルをアップロード
-uv --directory packages/modal_app run --env-file $(git rev-parse --show-toplevel)/.env modal deploy -m modal_app.app
+uv run --env-file $(git rev-parse --show-toplevel)/.env setup_modal.py
+uv run --env-file $(git rev-parse --show-toplevel)/.env modal deploy -m modal_app.app
 ```

@@ -1,10 +1,9 @@
 import io
-import os
 import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 from uuid import uuid4
 
 import torch
@@ -105,45 +104,6 @@ class FramePackInference:
         self.model_paths = model_paths
         self.settings = settings
         self._shared_models: dict[str, Any] = {}
-
-    @classmethod
-    def from_env(cls) -> Self:
-        def _require_env(key: str) -> str:
-            value = os.getenv(key)
-            if not value:
-                raise InferenceError(f"環境変数 {key} が未設定です")
-            return value
-
-        def _resolve_path(value: str) -> str:
-            path = Path(value)
-            return str(path.expanduser().resolve())
-
-        model_paths = ModelPaths(
-            dit=_resolve_path(_require_env("IMPOSTOR_DIT_PATH")),
-            vae=_resolve_path(_require_env("IMPOSTOR_VAE_PATH")),
-            text_encoder1=_resolve_path(_require_env("IMPOSTOR_TEXT_ENCODER1_PATH")),
-            text_encoder2=_resolve_path(_require_env("IMPOSTOR_TEXT_ENCODER2_PATH")),
-            image_encoder=_resolve_path(_require_env("IMPOSTOR_IMAGE_ENCODER_PATH")),
-            lora_weight=[_resolve_path(weight)]
-            if (weight := os.getenv("IMPOSTOR_LORA_WEIGHT"))
-            else None,
-            lora_multiplier=[float(os.getenv("IMPOSTOR_LORA_MULTIPLIER", "1.0"))],
-        )
-
-        settings = GenerationSettings(
-            prompt=os.getenv(
-                "IMPOSTOR_PROMPT",
-                "360-degree orbit around the subject, camera rising in a spiral.",
-            ),
-            video_sections=int(os.getenv("IMPOSTOR_VIDEO_SECTIONS", "4")),
-            fps=int(os.getenv("IMPOSTOR_FPS", "30")),
-            infer_steps=int(os.getenv("IMPOSTOR_INFER_STEPS", "15")),
-            latent_window_size=int(os.getenv("IMPOSTOR_LATENT_WINDOW", "5")),
-            cache_dir=Path(_resolve_path(os.getenv("IMPOSTOR_CACHE_DIR", "cache"))),
-            output_dir=Path(_resolve_path(os.getenv("IMPOSTOR_OUTPUT_DIR", "output"))),
-            bucket_resolution=int(os.getenv("IMPOSTOR_BUCKET_RES", "640")),
-        )
-        return cls(model_paths=model_paths, settings=settings)
 
     def generate_to_path(
         self,

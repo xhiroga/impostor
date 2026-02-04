@@ -323,6 +323,45 @@ function App() {
           <p className="status-text">{viewerAngles}</p>
         </section>
       </main>
+      <footer className="app-footer">
+        <div className="footer-content">
+          <span>Made by</span>
+          <a
+            href="https://sawara.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="footer-link"
+          >
+            <video
+              ref={(video) => {
+                if (!video) return;
+                const playOnLoad = () => {
+                  video.currentTime = 0;
+                  video.play();
+                };
+                setTimeout(playOnLoad, 1000);
+                video.onended = () => {
+                  video.pause();
+                };
+              }}
+              className="footer-avatar"
+              muted
+              playsInline
+            >
+              <source src="/images/logo.mp4" type="video/mp4" />
+            </video>
+          </a>
+          <span>on</span>
+          <a
+            href="https://github.com/xhiroga/impostor"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="footer-link"
+          >
+            <img src="/images/github-mark.svg" alt="GitHub" className="footer-github" />
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
