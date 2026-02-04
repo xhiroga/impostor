@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-editable
 
 COPY main.py ./
-COPY inference.py ./
+COPY config.py ./
 COPY frontend/build ./frontend/build
 
 ENV PYTHONUNBUFFERED=1
