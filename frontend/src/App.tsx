@@ -20,7 +20,7 @@ function App() {
   const [bgEnabled, setBgEnabled] = useState(true);
   const [inferSteps, setInferSteps] = useState(15);
   const [cfgScale, setCfgScale] = useState(1.0);
-  const [loraMultiplier, setLoraMultiplier] = useState(1.0);
+  const [loraMultiplier, setLoraMultiplier] = useState(1.5);
   const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
   const [totalFrames] = useState(73);
   const [latentWindowSize] = useState(9);
@@ -211,7 +211,7 @@ function App() {
                 <input
                   type="number"
                   min={0}
-                  max={2}
+                  max={10}
                   step={0.05}
                   value={loraMultiplier}
                   onChange={(event) => setLoraMultiplier(Number(event.target.value))}

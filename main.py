@@ -147,7 +147,7 @@ def build_infer_engine_from_env() -> FramePackInference:
         lora_weight=[_resolve_path(weight)]
         if (weight := os.getenv("IMPOSTOR_LORA_WEIGHT"))
         else None,
-        lora_multiplier=[float(os.getenv("IMPOSTOR_LORA_MULTIPLIER", "1.0"))],
+        lora_multiplier=[float(os.getenv("IMPOSTOR_LORA_MULTIPLIER", "1.5"))],
     )
     settings = GenerationSettings(
         prompt=os.getenv(
