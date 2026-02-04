@@ -49,7 +49,7 @@ MODAL_TIMEOUT_SECONDS = 600.0
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 VIDEO_SOURCES = (
-    ("samples", SAMPLE_DIR),
+    ("sample", SAMPLE_DIR),
     ("output", OUTPUT_DIR),
 )
 
@@ -348,7 +348,7 @@ def _run_modal_inference(
 
 app = FastAPI()
 for mount_path, directory in (
-    ("/samples", SAMPLE_DIR),
+    ("/sample", SAMPLE_DIR),
     ("/output", OUTPUT_DIR),
 ):
     if directory.exists():

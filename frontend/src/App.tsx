@@ -300,8 +300,11 @@ function App() {
               </div>
             </details>
             <button className="cta" type="submit" disabled={!file || !engineReady || isUploading}>
-              {isUploading ? '推論中...' : '推論スタート'}
+              {isUploading ? '推論中...' : '推論開始（約3分）'}
             </button>
+            <p className="muted note-text" style={{ textAlign: 'center' }}>
+              サーバーに送信された画像・動画は、30日後に削除されます。
+            </p>
           </form>
           {inferMessage && <p className="success-text">{inferMessage}</p>}
           {inferError && <p className="error-text">{inferError}</p>}

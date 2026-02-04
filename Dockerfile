@@ -15,6 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY main.py ./
 COPY config.py ./
+COPY sample/ ./sample
 COPY frontend/build ./frontend/build
 
 ENV PYTHONUNBUFFERED=1
