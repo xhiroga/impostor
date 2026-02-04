@@ -4,8 +4,6 @@ version = "0.2.0"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "hatchling",
-    "setuptools",
     "torch>=2.9.1",
     "torchvision>=0.24.1",
     "huggingface-hub[cli]",
@@ -35,9 +33,9 @@ dev = [
 
 [tool.uv]
 link-mode = "copy"
-no-build-isolation = true
 
 [tool.uv.extra-build-dependencies]
+diffsynth = ["setuptools"]
 musubi-tuner = ["hatchling"]
 sageattention = ["torch"]
 

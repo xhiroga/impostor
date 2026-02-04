@@ -6,7 +6,7 @@ MODEL_PATH ?= /workspace/models
 TMP ?= /workspace/tmp
 
 .ONESHELL:
-.PHONY: train cache models wan_train wan_cache wan_models run-comfyui frontend-build demo
+.PHONY: train cache models wan_train wan_cache wan_models run-comfyui frontend-build demo docker-run eval
 
 # Models (Total < 200GB)
 models = \
@@ -276,6 +276,15 @@ frontend-build:
 
 demo: frontend-build
 	uv run fastapi dev main.py
+
+docker-run: frontend-build
+	docker build -t impostor .
+	docker run \
+		--rm \
+		-p 8000:8000 \
+		--env-file .env \
+		-v output:/app/output \
+		impostor
 
 eval:
 	uv run --extra eval evaluation/main.py --video $(video)
