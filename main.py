@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 APP_DIR = Path(__file__).resolve().parent
 SAMPLE_DIR = APP_DIR / "sample"
 OUTPUT_DIR = APP_DIR / "output"
-ASSET_DIR = APP_DIR / "assets"
 TMP_DIR = APP_DIR / "tmp"
 FRONTEND_BUILD_DIR = APP_DIR / "frontend" / "build"
 
@@ -61,7 +60,6 @@ app = FastAPI()
 for mount_path, directory in (
     ("/samples", SAMPLE_DIR),
     ("/output", OUTPUT_DIR),
-    ("/assets", ASSET_DIR),
 ):
     if directory.exists():
         app.mount(
