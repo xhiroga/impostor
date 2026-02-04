@@ -43,9 +43,10 @@ COPY pyproject.toml ./pyproject.toml
 COPY uv.lock ./uv.lock
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-editable --frozen
+    uv sync --extra gpu --no-editable --frozen
 
 COPY main.py ./main.py
+COPY config.py ./config.py
 COPY inference.py ./inference.py
 
 WORKDIR /workspace

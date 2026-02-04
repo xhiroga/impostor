@@ -145,8 +145,8 @@ $(MODEL_PATH)/diffusion_models/Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors: FILE=W
 train:
 	IMAGE_ENCODER=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["image_encoder"])')
 
-	uv run wandb login $(WANDB_API_KEY)
-	uv run \
+	uv run --extra gpu wandb login $(WANDB_API_KEY)
+	uv run --extra gpu \
 		accelerate launch \
 			--num_processes 1 \
 			--dynamo_backend=no \
@@ -164,13 +164,13 @@ cache: $(models)
 	TEXT_ENCODER1=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["text_encoder1"])')
 	TEXT_ENCODER2=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["text_encoder2"])')
 
-	uv run -m musubi_tuner.fpack_cache_latents \
+	uv run --extra gpu -m musubi_tuner.fpack_cache_latents \
 		--dataset_config $$DATASET_CONFIG \
 		--vae $$VAE \
 		--image_encoder $$IMAGE_ENCODER \
 		--vae_chunk_size 32 --vae_tiling
 
-	uv run -m musubi_tuner.fpack_cache_text_encoder_outputs \
+	uv run --extra gpu -m musubi_tuner.fpack_cache_text_encoder_outputs \
 		--dataset_config $$DATASET_CONFIG \
 		--text_encoder1 $$TEXT_ENCODER1 \
 		--text_encoder2 $$TEXT_ENCODER2 \
@@ -181,8 +181,8 @@ cache: $(models)
 # https://deepwiki.com/search/vaetiling-vaespatialtilesample_d53d814c-27e9-405f-a43f-111b316047a3
 
 wan_train:
-	uv run wandb login $(WANDB_API_KEY)
-	uv run \
+	uv run --extra gpu wandb login $(WANDB_API_KEY)
+	uv run --extra gpu \
 		accelerate launch \
 			--num_processes 1 \
 			--dynamo_backend=no \
@@ -198,19 +198,19 @@ wan_cache: $(wan_models)
 	T5=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["t5"])')
 	CLIP=$$(uv run python -c 'from tomllib import load; d=load(open("$(CONFIG_FILE)", "rb")); print(d["clip"])')
 
-	uv run -m musubi_tuner.wan_cache_latents \
+	uv run --extra gpu -m musubi_tuner.wan_cache_latents \
 		--dataset_config $$DATASET_CONFIG \
 		--vae $$VAE \
 		$${CLIP:+--clip $$CLIP} \
 		--i2v
 
-	uv run -m musubi_tuner.wan_cache_text_encoder_outputs \
+	uv run --extra gpu -m musubi_tuner.wan_cache_text_encoder_outputs \
 		--dataset_config $$DATASET_CONFIG \
 		--t5 $$T5 \
 		--batch_size 16
 
 diffsynth_train:
-	uv run accelerate launch -m examples.wanvideo.model_training.train \
+	uv run --extra gpu accelerate launch -m examples.wanvideo.model_training.train \
 		--dataset_base_path /workspace/impostor-data \
 		--dataset_metadata_path /workspace/impostor/configs/diffsynth/v1/metadata_camera_control.csv \
 		--data_file_keys "video,control_video,reference_image" \
@@ -230,7 +230,7 @@ diffsynth_train:
 		--min_timestep_boundary 0.358
 # boundary corresponds to timesteps [0, 900]
 
-	uv run accelerate launch -m examples.wanvideo.model_training.train \
+	uv run --extra gpu accelerate launch -m examples.wanvideo.model_training.train \
 		--dataset_base_path /workspace/impostor-data \
 		--dataset_metadata_path /workspace/impostor/configs/diffsynth/v1/metadata_camera_control.csv \
 		--data_file_keys "video,control_video,reference_image" \
@@ -274,14 +274,28 @@ run-comfyui:
 frontend-build:
 	cd frontend && pnpm install && pnpm run build
 
+configure-bucket:
+	@AWS_ACCESS_KEY_ID="$(CLOUDFLARE_R2_ACCESS_KEY_ID)" \
+	AWS_SECRET_ACCESS_KEY="$(CLOUDFLARE_R2_SECRET_ACCESS_KEY)" \
+	aws s3api put-bucket-lifecycle-configuration \
+		--endpoint-url "$(CLOUDFLARE_R2_S3_API)" \
+		--bucket "$(CLOUDFLARE_R2_BUCKET)" \
+		--lifecycle-configuration "Rules=[{ID=impostor-expire-30d,Status=Enabled,Expiration={Days=30}}]"
+	@AWS_ACCESS_KEY_ID="$(CLOUDFLARE_R2_ACCESS_KEY_ID)" \
+	AWS_SECRET_ACCESS_KEY="$(CLOUDFLARE_R2_SECRET_ACCESS_KEY)" \
+	aws s3api put-bucket-cors \
+		--endpoint-url "$(CLOUDFLARE_R2_S3_API)" \
+		--bucket "$(CLOUDFLARE_R2_BUCKET)" \
+		--cors-configuration '{"CORSRules":[{"AllowedOrigins":["http://localhost:8080","https://impostor.sawara.dev"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["Accept-Ranges","Content-Range","Content-Length","ETag","Last-Modified"],"MaxAgeSeconds":300}]}'
+
 demo: frontend-build
-	uv run fastapi dev main.py
+	uv run --extra gpu fastapi dev main.py --port 8080
 
 docker-run: frontend-build
 	docker build -t impostor .
 	docker run \
 		--rm \
-		-p 8000:8000 \
+		-p 8080:8080 \
 		--env-file .env \
 		-v output:/app/output \
 		impostor

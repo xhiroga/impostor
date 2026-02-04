@@ -20,7 +20,7 @@ git clone https://huggingface.co/datasets/sawara-dev/impostor-data
 git clone https://github.com/xhiroga/impostor
 cd impostor
 uv pip install hatchling
-uv sync
+uv sync --extra gpu
 zellij  # or tmux
 make models
 make cache
@@ -30,6 +30,6 @@ make train
 ## Deploy
 
 ```sh
-uv run --env-file $(git rev-parse --show-toplevel)/.env setup_modal.py
-uv run --env-file $(git rev-parse --show-toplevel)/.env modal deploy -m modal_app.app
+uv run --extra gpu --env-file $(git rev-parse --show-toplevel)/.env setup_modal.py
+uv run --extra gpu --env-file $(git rev-parse --show-toplevel)/.env modal deploy -m modal_app
 ```

@@ -5,6 +5,7 @@ import { ThreeViewer } from './components/ThreeViewer';
 
 function App() {
   const [videos, setVideos] = useState<VideoEntry[]>([]);
+  const [extraVideos, setExtraVideos] = useState<VideoEntry[]>([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [viewerAngles, setViewerAngles] = useState('');
   const [inferMessage, setInferMessage] = useState('');
@@ -20,7 +21,7 @@ function App() {
   const [bgEnabled, setBgEnabled] = useState(true);
   const [inferSteps, setInferSteps] = useState(15);
   const [cfgScale, setCfgScale] = useState(1.0);
-  const [loraMultiplier, setLoraMultiplier] = useState(1.0);
+  const [loraMultiplier, setLoraMultiplier] = useState(1.5);
   const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
   const [totalFrames] = useState(73);
   const [latentWindowSize] = useState(9);
@@ -38,20 +39,32 @@ function App() {
     }
   }, []);
 
+  const mergeVideos = useCallback((base: VideoEntry[], extra: VideoEntry[]) => {
+    const seen = new Set<string>();
+    const merged: VideoEntry[] = [];
+    for (const entry of [...base, ...extra]) {
+      if (seen.has(entry.value)) continue;
+      seen.add(entry.value);
+      merged.push(entry);
+    }
+    return merged;
+  }, []);
+
   const refreshVideos = useCallback(
-    async (preferred?: string) => {
+    async (preferred?: string, extraOverride?: VideoEntry[]) => {
       setLoadingVideos(true);
       setVideoError('');
       try {
         const list = await fetchVideos();
         setVideos(list);
-        if (!list.length) {
+        const merged = mergeVideos(list, extraOverride ?? extraVideos);
+        if (!merged.length) {
           setSelectedVideo('');
           return;
         }
-        const resolved = preferred && list.find((entry) => entry.value === preferred)
+        const resolved = preferred && merged.find((entry) => entry.value === preferred)
           ? preferred
-          : list[0].value;
+          : merged[0].value;
         setSelectedVideo(resolved);
       } catch (error) {
         console.error('Failed to fetch videos', error);
@@ -61,7 +74,7 @@ function App() {
         setLoadingVideos(false);
       }
     },
-    [],
+    [extraVideos, mergeVideos],
   );
 
   useEffect(() => {
@@ -123,7 +136,11 @@ function App() {
       };
       const result = await requestInference(file, options);
       setInferMessage(result.message);
-      await refreshVideos(result.video.value);
+      const nextExtra = mergeVideos(extraVideos, [result.video]);
+      setExtraVideos(nextExtra);
+      setSelectedVideo(result.video.value);
+      await triggerDownload(result.video.value);
+      await refreshVideos(result.video.value, nextExtra);
       await refreshStatus();
     } catch (error) {
       console.error('Inference failed', error);
@@ -138,6 +155,45 @@ function App() {
     setBgColor(color);
     setBgEnabled(true);
   }, []);
+
+  const triggerDownload = async (value: string) => {
+    const isAbsolute = /^https?:\/\//i.test(value);
+    const downloadUrl = isAbsolute ? value : `/${value}`;
+    const filename = value.split('/').pop() || 'impostor.mp4';
+    const isSameOrigin = !isAbsolute || downloadUrl.startsWith(window.location.origin);
+
+    if (isSameOrigin) {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      return;
+    }
+
+    try {
+      const res = await fetch(downloadUrl, { mode: 'cors' });
+      if (!res.ok) {
+        throw new Error(`download failed: ${res.status}`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error('Auto download failed', error);
+      window.open(downloadUrl, '_blank', 'noopener');
+    }
+  };
+
+  const mergedVideos = mergeVideos(videos, extraVideos);
 
   return (
     <div className="app-shell">
@@ -211,7 +267,7 @@ function App() {
                 <input
                   type="number"
                   min={0}
-                  max={2}
+                  max={10}
                   step={0.05}
                   value={loraMultiplier}
                   onChange={(event) => setLoraMultiplier(Number(event.target.value))}
@@ -244,8 +300,11 @@ function App() {
               </div>
             </details>
             <button className="cta" type="submit" disabled={!file || !engineReady || isUploading}>
-              {isUploading ? '推論中...' : '推論スタート'}
+              {isUploading ? '推論中...' : '推論開始（約3分）'}
             </button>
+            <p className="muted note-text" style={{ textAlign: 'center' }}>
+              サーバーに送信された画像・動画は、30日後に削除されます。
+            </p>
           </form>
           {inferMessage && <p className="success-text">{inferMessage}</p>}
           {inferError && <p className="error-text">{inferError}</p>}
@@ -259,35 +318,33 @@ function App() {
           </div>
           <label className="select-field">
             動画セレクタ
-            <select
-              value={selectedVideo}
-              onChange={(event) => setSelectedVideo(event.target.value)}
-              disabled={!videos.length || loadingVideos}
-            >
-              {videos.map((video) => (
-                <option key={video.value} value={video.value}>
-                  {video.label}
-                </option>
-              ))}
-            </select>
+            <div className="select-row">
+              <select
+                value={selectedVideo}
+                onChange={(event) => setSelectedVideo(event.target.value)}
+                disabled={!mergedVideos.length || loadingVideos}
+              >
+                {mergedVideos.map((video) => (
+                  <option key={video.value} value={video.value}>
+                    {video.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="download-button"
+                disabled={!selectedVideo}
+                onClick={() => triggerDownload(selectedVideo)}
+              >
+                ダウンロード
+              </button>
+            </div>
           </label>
           <div className="color-row">
             <div className="color-row-head">
               <label className="color-label" htmlFor="chroma-key-color">
                 クロマキー
               </label>
-              <div className="color-actions">
-                {bgEnabled && (
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => setBgEnabled(false)}
-                    aria-label="背景色選択をクリア"
-                  >
-                    クリア
-                  </button>
-                )}
-              </div>
             </div>
             <div className="color-inputs">
               <input
@@ -307,6 +364,16 @@ function App() {
                 value={bgEnabled ? bgColor.toUpperCase() : '未選択'}
                 readOnly
               />
+              {bgEnabled && (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => setBgEnabled(false)}
+                  aria-label="背景色選択をクリア"
+                >
+                  クリア
+                </button>
+              )}
             </div>
           </div>
           {loadingVideos && <p className="muted" style={{ fontSize: '0.85rem' }}>動画リストを更新中...</p>}
