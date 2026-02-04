@@ -223,7 +223,7 @@ def construct_args(
     args.rope_scaling_timestep_threshold = None
     args.fp8_llm = False
     args.device = "cuda"
-    args.attn_mode = "sdpa"
+    args.attn_mode = "sageattn"
     args.vae_chunk_size = 32
     args.vae_spatial_tile_sample_min_size = 128
     args.vae_tiling = False
