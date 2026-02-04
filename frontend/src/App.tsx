@@ -3,6 +3,12 @@ import './App.css';
 import { fetchStatus, fetchVideos, requestInference, type InferOptions, type VideoEntry } from './api';
 import { ThreeViewer } from './components/ThreeViewer';
 
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
 function App() {
   const [videos, setVideos] = useState<VideoEntry[]>([]);
   const [extraVideos, setExtraVideos] = useState<VideoEntry[]>([]);
@@ -25,8 +31,14 @@ function App() {
   const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
   const [totalFrames] = useState(73);
   const [latentWindowSize] = useState(9);
+  const [showFundingPrompt, setShowFundingPrompt] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const trackEvent = useCallback((name: string, params?: Record<string, unknown>) => {
+    if (!window.gtag) return;
+    window.gtag('event', name, params ?? {});
+  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -126,6 +138,7 @@ function App() {
     setIsUploading(true);
     setInferError('');
     try {
+      trackEvent('generate_impostor_start');
       const options: InferOptions = {
         steps: inferSteps,
         cfg: cfgScale,
@@ -136,6 +149,8 @@ function App() {
       };
       const result = await requestInference(file, options);
       setInferMessage(result.message);
+      setShowFundingPrompt(true);
+      trackEvent('generate_impostor_success', { steps: inferSteps, cfg: cfgScale, lora: loraMultiplier });
       const nextExtra = mergeVideos(extraVideos, [result.video]);
       setExtraVideos(nextExtra);
       setSelectedVideo(result.video.value);
@@ -159,7 +174,7 @@ function App() {
   const triggerDownload = async (value: string) => {
     const isAbsolute = /^https?:\/\//i.test(value);
     const downloadUrl = isAbsolute ? value : `/${value}`;
-    const filename = value.split('/').pop() || 'impostor.mp4';
+    const filename = (value.split('/').pop() || 'impostor.mp4').split('?')[0] || 'impostor.mp4';
     const isSameOrigin = !isAbsolute || downloadUrl.startsWith(window.location.origin);
 
     if (isSameOrigin) {
@@ -290,12 +305,10 @@ function App() {
                 <label className="control-field">
                   Total Frames
                   <input type="number" value={totalFrames} disabled />
-                  <span className="field-note">デフォルト 73（ビューア想定）</span>
                 </label>
                 <label className="control-field">
                   Latent Window Size
                   <input type="number" value={latentWindowSize} disabled />
-                  <span className="field-note">デフォルト 9（固定）</span>
                 </label>
               </div>
             </details>
@@ -309,6 +322,20 @@ function App() {
           {inferMessage && <p className="success-text">{inferMessage}</p>}
           {inferError && <p className="error-text">{inferError}</p>}
           {!engineReady && engineError && <p className="error-text">{engineError}</p>}
+          {showFundingPrompt && (
+            <p className="funding-note">
+              個人の趣味で運営しています。よければ
+              <a
+                href="https://github.com/sponsors/xhiroga"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackEvent('funding_link_click', { location: 'infer_complete' })}
+              >
+                Sponsor
+              </a>
+              で応援してもらえると嬉しいです。
+            </p>
+          )}
         </section>
         <section className="panel">
           <div className="panel-head">
@@ -426,6 +453,27 @@ function App() {
             className="footer-link"
           >
             <img src="/images/github-mark.svg" alt="GitHub" className="footer-github" />
+          </a>
+          <span className="footer-sep">/</span>
+          <a
+            href="https://github.com/sponsors/xhiroga"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="footer-link is-sponsor"
+            onClick={() => trackEvent('funding_link_click', { location: 'footer' })}
+          >
+            スポンサーを募集しています
+            <svg
+              className="footer-heart"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="currentColor"
+                d="m8 14.25.345.666a.75.75 0 0 1-.69 0l-.008-.004-.018-.01a7.152 7.152 0 0 1-.31-.17 22.055 22.055 0 0 1-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.066 22.066 0 0 1-3.744 2.584l-.018.01-.006.003h-.002ZM4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.58 20.58 0 0 0 8 13.393a20.58 20.58 0 0 0 3.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.749.749 0 0 1-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5Z"
+              />
+            </svg>
           </a>
         </div>
         <p className="footer-note">アクセス解析にGoogle Analyticsを使用しています。</p>

@@ -3,8 +3,9 @@
   --fg: #111827;
   --muted: #6b7280;
   --border: #e5e7eb;
-  --accent: #2563eb;
+  --accent: #f58b00;
   --card: #ffffff;
+  --fgColor-sponsors: #bf3989;
 }
 
 body {
@@ -87,7 +88,7 @@ body {
 
 .control-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
@@ -308,8 +309,9 @@ button.cta:not(:disabled):hover {
   align-self: flex-start;
   padding: 0.55rem 1rem;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #fff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
@@ -321,17 +323,23 @@ button.cta:not(:disabled):hover {
 }
 
 .download-button:not(:disabled):hover {
-  border-color: var(--accent);
+  opacity: 0.9;
   transform: translateY(-1px);
 }
 
 .viewer-shell {
   border: 1px solid var(--border);
   border-radius: 16px;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1 / 1;
   background: #fff;
   overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 900px) {
+  .control-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
 }
 
 
@@ -361,6 +369,19 @@ button.cta:not(:disabled):hover {
   margin: 0.35rem 0 0;
 }
 
+.funding-note {
+  font-size: 0.85rem;
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.funding-note a,
+.footer-note a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .app-footer {
   display: flex;
   flex-direction: column;
@@ -377,9 +398,18 @@ button.cta:not(:disabled):hover {
   font-size: 0.75rem;
 }
 
+.footer-sep {
+  opacity: 0.7;
+}
+
 .footer-link {
   color: inherit;
   text-decoration: none;
+}
+
+.footer-link.is-sponsor {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .footer-avatar {
@@ -399,6 +429,14 @@ button.cta:not(:disabled):hover {
   width: 20px;
   height: 20px;
   display: block;
+}
+
+.footer-heart {
+  width: 14px;
+  height: 14px;
+  margin-left: 0.2rem;
+  vertical-align: text-bottom;
+  color: var(--fgColor-sponsors);
 }
 
 .footer-note {
