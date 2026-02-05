@@ -13,7 +13,7 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -67,6 +67,16 @@ def _list_videos() -> list[dict[str, str]]:
                 }
             )
     return videos
+
+
+def _debug_sample_video() -> dict[str, str]:
+    if not SAMPLE_DIR.exists():
+        raise InferenceError("sample ディレクトリが存在しません")
+    candidates = sorted(SAMPLE_DIR.glob("*.mp4"))
+    if not candidates:
+        raise InferenceError("sample に mp4 が見つかりません")
+    sample = candidates[0]
+    return {"value": f"sample/{sample.name}", "label": f"sample · {sample.stem}"}
 
 
 def _execution_mode() -> str:
@@ -383,6 +393,7 @@ async def run_inference(
     prompt: Annotated[str | None, Form()] = None,
     total_frames: Annotated[int | None, Form()] = None,
     latent_window_size: Annotated[int | None, Form()] = None,
+    debug: Annotated[bool | None, Query()] = None,
 ):
     infer_engine = _get_infer_engine() if _execution_mode() == "local" else None
     if infer_engine is None and _execution_mode() == "local":
@@ -398,6 +409,13 @@ async def run_inference(
         raise HTTPException(
             status_code=400, detail="画像ファイルの読み込みに失敗しました"
         )
+
+    if debug:
+        return {
+            "message": "debug: sample",
+            "video": _debug_sample_video(),
+            "upload_filename": image.filename or "debug",
+        }
 
     TMP_DIR.mkdir(parents=True, exist_ok=True)
     suffix = Path(image.filename).suffix or ".png"

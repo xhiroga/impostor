@@ -31,7 +31,13 @@ function App() {
   const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
   const [totalFrames] = useState(73);
   const [latentWindowSize] = useState(9);
-  const [showFundingPrompt, setShowFundingPrompt] = useState(false);
+  const [isDirty, setIsDirty] = useState(true);
+  const [resultVideo, setResultVideo] = useState<VideoEntry | null>(null);
+  const debugMode = (() => {
+    const value = new URLSearchParams(window.location.search).get('debug');
+    if (!value) return false;
+    return value !== '0' && value.toLowerCase() !== 'false';
+  })();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,11 +114,16 @@ function App() {
     }
   }, [selectedVideo]);
 
+  const markDirty = () => {
+    setIsDirty(true);
+  };
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
     setFile(nextFile);
     setInferMessage('');
     setInferError('');
+    markDirty();
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
@@ -130,11 +141,12 @@ function App() {
     setPreviewUrl(null);
     setInferMessage('');
     setInferError('');
+    setIsDirty(true);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!file || !engineReady) return;
+    if (!file || !engineReady || !isDirty) return;
     setIsUploading(true);
     setInferError('');
     try {
@@ -147,14 +159,14 @@ function App() {
         totalFrames,
         latentWindowSize,
       };
-      const result = await requestInference(file, options);
+      const result = await requestInference(file, options, debugMode);
       setInferMessage(result.message);
-      setShowFundingPrompt(true);
+      setIsDirty(false);
+      setResultVideo(result.video);
       trackEvent('generate_impostor_success', { steps: inferSteps, cfg: cfgScale, lora: loraMultiplier });
       const nextExtra = mergeVideos(extraVideos, [result.video]);
       setExtraVideos(nextExtra);
       setSelectedVideo(result.video.value);
-      await triggerDownload(result.video.value);
       await refreshVideos(result.video.value, nextExtra);
       await refreshStatus();
     } catch (error) {
@@ -257,7 +269,10 @@ function App() {
                   max={200}
                   step={1}
                   value={inferSteps}
-                  onChange={(event) => setInferSteps(Number(event.target.value))}
+                  onChange={(event) => {
+                    setInferSteps(Number(event.target.value));
+                    markDirty();
+                  }}
                   disabled={!engineReady || isUploading}
                 />
               </label>
@@ -269,7 +284,10 @@ function App() {
                   max={20}
                   step={0.1}
                   value={cfgScale}
-                  onChange={(event) => setCfgScale(Number(event.target.value))}
+                  onChange={(event) => {
+                    setCfgScale(Number(event.target.value));
+                    markDirty();
+                  }}
                   disabled={!engineReady || isUploading}
                 />
               </label>
@@ -281,7 +299,10 @@ function App() {
                   max={10}
                   step={0.05}
                   value={loraMultiplier}
-                  onChange={(event) => setLoraMultiplier(Number(event.target.value))}
+                  onChange={(event) => {
+                    setLoraMultiplier(Number(event.target.value));
+                    markDirty();
+                  }}
                   disabled={!engineReady || isUploading}
                 />
               </label>
@@ -294,7 +315,10 @@ function App() {
                   <textarea
                     rows={3}
                     value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
+                    onChange={(event) => {
+                      setPrompt(event.target.value);
+                      markDirty();
+                    }}
                     disabled={!engineReady || isUploading}
                   />
                 </label>
@@ -310,30 +334,15 @@ function App() {
                 </div>
               </div>
             </details>
-            <button className="cta" type="submit" disabled={!file || !engineReady || isUploading}>
-              {isUploading ? '推論中...' : '推論開始（約3分）'}
+            <button className="cta" type="submit" disabled={!file || !engineReady || isUploading || !isDirty}>
+              {isUploading ? '推論中...' : isDirty ? '推論開始（約3分）' : '推論完了'}
             </button>
             <p className="muted note-text" style={{ textAlign: 'center' }}>
               サーバーに保存された画像・動画は、30日間で自動的に削除されます。
             </p>
           </form>
-          {inferMessage && <p className="success-text">{inferMessage}</p>}
           {inferError && <p className="error-text">{inferError}</p>}
           {!engineReady && engineError && <p className="error-text">{engineError}</p>}
-          {showFundingPrompt && (
-            <p className="funding-note">
-              個人の趣味で運営しています。よければ
-              <a
-                href="https://github.com/sponsors/xhiroga"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => trackEvent('funding_link_click', { location: 'infer_complete' })}
-              >
-                Sponsor
-              </a>
-              で応援してもらえると嬉しいです。
-            </p>
-          )}
         </section>
         <section className="panel">
           <div className="panel-head">
@@ -341,7 +350,7 @@ function App() {
             <p className="muted">カメラをドラッグすると角度に応じてフレームを切り替え、plane に貼り付けます。</p>
           </div>
           <label className="select-field">
-            動画セレクタ
+            動画を選択
             <div className="select-row">
               <select
                 value={selectedVideo}
@@ -475,6 +484,42 @@ function App() {
         </div>
         <p className="footer-note">アクセス解析にGoogle Analyticsを使用しています。</p>
       </footer>
+      {resultVideo && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <h3>推論が完了しました</h3>
+            <p className="muted">生成した動画はビューアで確認できます。</p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="cta"
+                onClick={() => {
+                  trackEvent('download_click', { location: 'result_modal' });
+                  triggerDownload(resultVideo.value);
+                }}
+              >
+                生成した動画をダウンロード
+              </button>
+              <a
+                className="secondary-button sponsor-button"
+                href="https://github.com/sponsors/xhiroga"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackEvent('funding_link_click', { location: 'result_modal' })}
+              >
+                この研究を支援する
+              </a>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setResultVideo(null)}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
