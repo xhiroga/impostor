@@ -45,7 +45,7 @@ function App() {
   const trackEvent = useCallback((name: string, params?: Record<string, unknown>) => {
     if (!window.gtag) return;
     window.gtag('event', name, params ?? {});
-  }, [t.statusFetchFailed]);
+  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -56,7 +56,7 @@ function App() {
       console.error('Failed to fetch status', error);
       setEngineError(t.statusFetchFailed);
     }
-  }, []);
+  }, [t.statusFetchFailed]);
 
   const mergeVideos = useCallback((base: VideoEntry[], extra: VideoEntry[]) => {
     const seen = new Set<string>();
