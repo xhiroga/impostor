@@ -45,7 +45,7 @@ function App() {
   const trackEvent = useCallback((name: string, params?: Record<string, unknown>) => {
     if (!window.gtag) return;
     window.gtag('event', name, params ?? {});
-  }, []);
+  }, [t.statusFetchFailed]);
 
   const refreshStatus = useCallback(async () => {
     try {
