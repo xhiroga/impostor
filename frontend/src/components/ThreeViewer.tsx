@@ -225,6 +225,17 @@ export function ThreeViewer({
     updateAngles(`Yaw ${yaw.toFixed(1)}° / Pitch ${pitch.toFixed(1)}° / Frame ${frameIndex}`);
   };
 
+  const syncFrameToCamera = () => {
+    const state = stateRef.current;
+    if (!state.frameBitmaps.length) {
+      return;
+    }
+    const { yaw, pitch } = extractAngles();
+    const frameIndex = mapAnglesToFrame(yaw, pitch);
+    updateTexture(frameIndex);
+    updateAngles(`Yaw ${yaw.toFixed(1)}° / Pitch ${pitch.toFixed(1)}° / Frame ${frameIndex}`);
+  };
+
   const updatePanelDimensions = (textureWidth: number, textureHeight: number) => {
     if (!textureWidth || !textureHeight) return;
     const height = PANEL_BASE_SIZE;
@@ -443,7 +454,7 @@ export function ThreeViewer({
     state.texture.colorSpace = THREE.SRGBColorSpace;
     rebuildPanelMesh();
     updatePanelDimensions(captureCanvas.width, captureCanvas.height);
-    updateTexture(0);
+    syncFrameToCamera();
     console.log('[viewer] texture updated', {
       texWidth: state.textureCanvas.width,
       texHeight: state.textureCanvas.height,
