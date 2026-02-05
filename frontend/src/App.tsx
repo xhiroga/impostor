@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import './App.css';
 import { fetchStatus, fetchVideos, requestInference, type InferOptions, type VideoEntry } from './api';
 import { ThreeViewer } from './components/ThreeViewer';
+import { getLocale, getMessages } from './i18n';
 
 declare global {
   interface Window {
@@ -10,6 +11,7 @@ declare global {
 }
 
 function App() {
+  const t = getMessages(getLocale());
   const [videos, setVideos] = useState<VideoEntry[]>([]);
   const [extraVideos, setExtraVideos] = useState<VideoEntry[]>([]);
   const [selectedVideo, setSelectedVideo] = useState('');
@@ -28,7 +30,7 @@ function App() {
   const [inferSteps, setInferSteps] = useState(15);
   const [cfgScale, setCfgScale] = useState(1.0);
   const [loraMultiplier, setLoraMultiplier] = useState(1.5);
-  const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
+  const [prompt, setPrompt] = useState(t.defaultPrompt);
   const [totalFrames] = useState(73);
   const [latentWindowSize] = useState(9);
   const [isDirty, setIsDirty] = useState(true);
@@ -53,7 +55,7 @@ function App() {
       setEngineError(status.infer_error);
     } catch (error) {
       console.error('Failed to fetch status', error);
-      setEngineError('推論エンジンの状態取得に失敗しました');
+      setEngineError(t.statusFetchFailed);
     }
   }, []);
 
@@ -84,13 +86,13 @@ function App() {
           ? preferred
           : merged[0].value;
         setSelectedVideo(resolved);
-      } catch (error) {
-        console.error('Failed to fetch videos', error);
-        const message = error instanceof Error ? error.message : '動画リストの取得に失敗しました';
-        setVideoError(message);
-      } finally {
-        setLoadingVideos(false);
-      }
+    } catch (error) {
+      console.error('Failed to fetch videos', error);
+      const message = error instanceof Error ? error.message : t.videosFetchFailed;
+      setVideoError(message);
+    } finally {
+      setLoadingVideos(false);
+    }
     },
     [extraVideos, mergeVideos],
   );
@@ -171,7 +173,7 @@ function App() {
       await refreshStatus();
     } catch (error) {
       console.error('Inference failed', error);
-      const message = error instanceof Error ? error.message : '推論に失敗しました';
+      const message = error instanceof Error ? error.message : t.inferFailed;
       setInferError(message);
     } finally {
       setIsUploading(false);
@@ -225,14 +227,21 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-head">
-        <h1>Impostor Maker</h1>
-        <p className="lead">単一の画像から軽量な偽の3Dモデルを生成します。裏側で動画生成モデルを使用。</p>
+        <h1>{t.title}</h1>
+        <p className="lead">
+          {t.lead.split('\n').map((line, index) => (
+            <span key={line}>
+              {line}
+              {index < t.lead.split('\n').length - 1 && <br />}
+            </span>
+          ))}
+        </p>
       </header>
       <main className="layout">
         <section className="panel">
           <div className="panel-head">
-            <h2>入力画像をアップロード</h2>
-            <p className="muted">768x768 にリサイズして推論します。</p>
+            <h2>{t.uploadTitle}</h2>
+            {t.uploadHint ? <p className="muted">{t.uploadHint}</p> : null}
           </div>
           <form className="infer-form" onSubmit={handleSubmit}>
             <input
@@ -247,22 +256,22 @@ function App() {
             <div className="upload-preview">
               <div className="upload-preview-head">
                 <button type="button" onClick={handleClear} disabled={!file}>
-                  クリア
+                  {t.clear}
                 </button>
               </div>
               <div className="preview-stage">
                 {previewUrl ? (
-                  <img src={previewUrl} alt="選択した画像のプレビュー" />
+                  <img src={previewUrl} alt={t.previewAlt} />
                 ) : (
                   <p className="muted" style={{ textAlign: 'center' }}>
-                    まだ画像が選択されていません。
+                    {t.previewEmpty}
                   </p>
                 )}
               </div>
             </div>
             <div className="control-grid">
               <label className="control-field">
-                Steps
+                {t.steps}
                 <input
                   type="number"
                   min={1}
@@ -277,7 +286,7 @@ function App() {
                 />
               </label>
               <label className="control-field">
-                CFG
+                {t.cfg}
                 <input
                   type="number"
                   min={0}
@@ -292,7 +301,7 @@ function App() {
                 />
               </label>
               <label className="control-field">
-                LoRA multiplier
+                {t.loraMultiplier}
                 <input
                   type="number"
                   min={0}
@@ -308,10 +317,10 @@ function App() {
               </label>
             </div>
             <details className="advanced-settings">
-              <summary>詳細設定</summary>
+              <summary>{t.advanced}</summary>
               <div className="advanced-grid">
                 <label className="control-field">
-                  Prompt
+                  {t.prompt}
                   <textarea
                     rows={3}
                     value={prompt}
@@ -324,21 +333,21 @@ function App() {
                 </label>
                 <div className="advanced-row">
                   <label className="control-field">
-                    Total Frames
+                    {t.totalFrames}
                     <input type="number" value={totalFrames} disabled />
                   </label>
                   <label className="control-field">
-                    Latent Window Size
+                    {t.latentWindow}
                     <input type="number" value={latentWindowSize} disabled />
                   </label>
                 </div>
               </div>
             </details>
             <button className="cta" type="submit" disabled={!file || !engineReady || isUploading || !isDirty}>
-              {isUploading ? '推論中...' : isDirty ? '推論開始（約3分）' : '推論完了'}
+              {isUploading ? t.inferRunning : isDirty ? t.inferStart : t.inferDone}
             </button>
             <p className="muted note-text" style={{ textAlign: 'center' }}>
-              サーバーに保存された画像・動画は、30日間で自動的に削除されます。
+              {t.retentionNote}
             </p>
           </form>
           {inferError && <p className="error-text">{inferError}</p>}
@@ -346,11 +355,11 @@ function App() {
         </section>
         <section className="panel">
           <div className="panel-head">
-            <h2>Impostor ビューア</h2>
-            <p className="muted">カメラをドラッグすると角度に応じてフレームを切り替え、plane に貼り付けます。</p>
+            <h2>{t.viewerTitle}</h2>
+            {t.viewerHint ? <p className="muted">{t.viewerHint}</p> : null}
           </div>
           <label className="select-field">
-            動画を選択
+            {t.videoSelect}
             <div className="select-row">
               <select
                 value={selectedVideo}
@@ -369,14 +378,14 @@ function App() {
                 disabled={!selectedVideo}
                 onClick={() => triggerDownload(selectedVideo)}
               >
-                ダウンロード
+                {t.download}
               </button>
             </div>
           </label>
           <div className="color-row">
             <div className="color-row-head">
               <label className="color-label" htmlFor="chroma-key-color">
-                クロマキー
+                {t.chromaKey}
               </label>
             </div>
             <div className="color-inputs">
@@ -394,7 +403,7 @@ function App() {
               <input
                 className={`color-code${bgEnabled ? '' : ' is-muted'}`}
                 type="text"
-                value={bgEnabled ? bgColor.toUpperCase() : '未選択'}
+                value={bgEnabled ? bgColor.toUpperCase() : t.unselected}
                 readOnly
               />
               {bgEnabled && (
@@ -402,14 +411,14 @@ function App() {
                   className="ghost-button"
                   type="button"
                   onClick={() => setBgEnabled(false)}
-                  aria-label="背景色選択をクリア"
+                  aria-label={t.clearBgAria}
                 >
-                  クリア
+                  {t.clear}
                 </button>
               )}
             </div>
           </div>
-          {loadingVideos && <p className="muted" style={{ fontSize: '0.85rem' }}>動画リストを更新中...</p>}
+          {loadingVideos && <p className="muted" style={{ fontSize: '0.85rem' }}>{t.loadingVideos}</p>}
           {videoError && <p className="error-text">{videoError}</p>}
           <div className="viewer-shell">
             <ThreeViewer
@@ -425,7 +434,7 @@ function App() {
       </main>
       <footer className="app-footer">
         <div className="footer-content">
-          <span>Made by</span>
+          <span>{t.madeBy}</span>
           <a
             href="https://sawara.dev"
             target="_blank"
@@ -451,7 +460,7 @@ function App() {
               <source src="/images/logo.mp4" type="video/mp4" />
             </video>
           </a>
-          <span>on</span>
+          <span>{t.on}</span>
           <a
             href="https://github.com/xhiroga/impostor"
             target="_blank"
@@ -468,7 +477,7 @@ function App() {
             className="footer-link is-sponsor"
             onClick={() => trackEvent('funding_link_click', { location: 'footer' })}
           >
-            スポンサーを募集しています
+            {t.sponsorLink}
             <svg
               className="footer-heart"
               viewBox="0 0 16 16"
@@ -482,13 +491,13 @@ function App() {
             </svg>
           </a>
         </div>
-        <p className="footer-note">アクセス解析にGoogle Analyticsを使用しています。</p>
+        <p className="footer-note">{t.analyticsNote}</p>
       </footer>
       {resultVideo && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-card">
-            <h3>推論が完了しました</h3>
-            <p className="muted">生成した動画はビューアで確認できます。</p>
+            <h3>{t.modalTitle}</h3>
+            <p className="muted">{t.modalHint}</p>
             <div className="modal-actions">
               <button
                 type="button"
@@ -498,7 +507,7 @@ function App() {
                   triggerDownload(resultVideo.value);
                 }}
               >
-                生成した動画をダウンロード
+                {t.modalDownload}
               </button>
               <a
                 className="secondary-button sponsor-button"
@@ -507,7 +516,7 @@ function App() {
                 rel="noopener noreferrer"
                 onClick={() => trackEvent('funding_link_click', { location: 'result_modal' })}
               >
-                この研究を支援する
+                {t.modalSupport}
               </a>
             </div>
             <button
@@ -515,7 +524,7 @@ function App() {
               className="ghost-button"
               onClick={() => setResultVideo(null)}
             >
-              閉じる
+              {t.modalClose}
             </button>
           </div>
         </div>
