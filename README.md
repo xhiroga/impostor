@@ -1,5 +1,8 @@
 # Impostor
 
+We propose a method for 360° rendering from a single image, leveraging the consistency of video generation models.
+By combining generated videos with a WebUI, we provide an experience where users can manipulate objects like 3D models at a low cost.
+
 ## Inference Demo
 
 ```sh
@@ -8,9 +11,9 @@ make demo
 
 ## Train
 
-1. RunPodでVolumeをアタッチしたPodを起動する
-2. Remote SSHで接続
-3. コマンドを実行
+1. Start a Pod with a Volume attached on RunPod.
+2. Connect via Remote SSH.
+3. Execute commands.
 
 ```sh
 cd /workspace

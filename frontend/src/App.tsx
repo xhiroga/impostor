@@ -81,19 +81,20 @@ function App() {
           setSelectedVideo('');
           return;
         }
-        const resolved = preferred && merged.find((entry) => entry.value === preferred)
-          ? preferred
+        const current = preferred ?? selectedVideo;
+        const resolved = current && merged.find((entry) => entry.value === current)
+          ? current
           : merged[0].value;
         setSelectedVideo(resolved);
-    } catch (error) {
-      console.error('Failed to fetch videos', error);
-      const message = error instanceof Error ? error.message : t.videosFetchFailed;
-      setVideoError(message);
+      } catch (error) {
+        console.error('Failed to fetch videos', error);
+        const message = error instanceof Error ? error.message : t.videosFetchFailed;
+        setVideoError(message);
     } finally {
       setLoadingVideos(false);
     }
     },
-    [extraVideos, mergeVideos],
+    [extraVideos, mergeVideos, selectedVideo, t.videosFetchFailed],
   );
 
   useEffect(() => {
@@ -165,7 +166,6 @@ function App() {
       const nextExtra = mergeVideos(extraVideos, [result.video]);
       setExtraVideos(nextExtra);
       setSelectedVideo(result.video.value);
-      await refreshVideos(result.video.value, nextExtra);
       await refreshStatus();
     } catch (error) {
       console.error('Inference failed', error);

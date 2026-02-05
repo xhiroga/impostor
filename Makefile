@@ -286,7 +286,7 @@ configure-bucket:
 	aws s3api put-bucket-cors \
 		--endpoint-url "$(CLOUDFLARE_R2_S3_API)" \
 		--bucket "$(CLOUDFLARE_R2_BUCKET)" \
-		--cors-configuration '{"CORSRules":[{"AllowedOrigins":["http://localhost:8080","https://impostor.sawara.dev"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["Accept-Ranges","Content-Range","Content-Length","ETag","Last-Modified"],"MaxAgeSeconds":300}]}'
+		--cors-configuration '{"CORSRules":[{"AllowedOrigins":["http://localhost:8080","http://127.0.0.1:8080","https://impostor.sawara.dev"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["Accept-Ranges","Content-Range","Content-Length","ETag","Last-Modified"],"MaxAgeSeconds":300}]}'
 
 demo: frontend-build
 	uv run --extra gpu fastapi dev main.py --port 8080
