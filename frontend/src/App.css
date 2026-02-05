@@ -145,6 +145,12 @@ body {
   gap: 0.75rem;
 }
 
+.advanced-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
 .file-input,
 .select-field select {
   border: 1px solid var(--border);
@@ -302,7 +308,7 @@ button.cta:not(:disabled):hover {
 }
 
 .select-row select {
-  width: min(320px, 100%);
+  width: min(380px, 100%);
 }
 
 .download-button {

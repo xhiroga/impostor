@@ -219,7 +219,6 @@ function App() {
       <main className="layout">
         <section className="panel">
           <div className="panel-head">
-            <p className="eyebrow">Upload</p>
             <h2>入力画像をアップロード</h2>
             <p className="muted">768x768 にリサイズして推論します。</p>
           </div>
@@ -235,9 +234,6 @@ function App() {
             />
             <div className="upload-preview">
               <div className="upload-preview-head">
-                <span className="muted" style={{ fontWeight: 600, color: 'var(--fg)' }}>
-                  入力画像プレビュー
-                </span>
                 <button type="button" onClick={handleClear} disabled={!file}>
                   クリア
                 </button>
@@ -302,21 +298,23 @@ function App() {
                     disabled={!engineReady || isUploading}
                   />
                 </label>
-                <label className="control-field">
-                  Total Frames
-                  <input type="number" value={totalFrames} disabled />
-                </label>
-                <label className="control-field">
-                  Latent Window Size
-                  <input type="number" value={latentWindowSize} disabled />
-                </label>
+                <div className="advanced-row">
+                  <label className="control-field">
+                    Total Frames
+                    <input type="number" value={totalFrames} disabled />
+                  </label>
+                  <label className="control-field">
+                    Latent Window Size
+                    <input type="number" value={latentWindowSize} disabled />
+                  </label>
+                </div>
               </div>
             </details>
             <button className="cta" type="submit" disabled={!file || !engineReady || isUploading}>
               {isUploading ? '推論中...' : '推論開始（約3分）'}
             </button>
             <p className="muted note-text" style={{ textAlign: 'center' }}>
-              サーバーに送信された画像・動画は、30日間で自動的に削除されます。
+              サーバーに保存された画像・動画は、30日間で自動的に削除されます。
             </p>
           </form>
           {inferMessage && <p className="success-text">{inferMessage}</p>}
@@ -339,7 +337,6 @@ function App() {
         </section>
         <section className="panel">
           <div className="panel-head">
-            <p className="eyebrow">Preview</p>
             <h2>Impostor ビューア</h2>
             <p className="muted">カメラをドラッグすると角度に応じてフレームを切り替え、plane に貼り付けます。</p>
           </div>
