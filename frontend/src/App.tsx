@@ -505,6 +505,7 @@ function App() {
               >
                 {t.modalDownload}
               </button>
+              {/*
               <a
                 className="secondary-button sponsor-button"
                 href="https://github.com/sponsors/xhiroga"
@@ -514,6 +515,7 @@ function App() {
               >
                 {t.modalSupport}
               </a>
+              */}
             </div>
             <button
               type="button"
