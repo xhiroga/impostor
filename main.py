@@ -442,11 +442,6 @@ async def run_inference(
                 total_frames=total_frames,
                 latent_window_size=latent_window_size,
             )
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            safe_name = Path(modal_filename).name or f"{session_id}.mp4"
-            output_path = OUTPUT_DIR / safe_name
-            output_path.write_bytes(video_bytes)
-            video_path = output_path
             if _r2_enabled():
                 output_key = _r2_key(session_folder, "output.mp4")
                 _r2_upload_bytes(
