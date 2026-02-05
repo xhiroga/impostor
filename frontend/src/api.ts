@@ -41,7 +41,11 @@ export async function fetchVideos(): Promise<VideoEntry[]> {
   return handleJson<VideoEntry[]>(res);
 }
 
-export async function requestInference(file: File, options: InferOptions): Promise<InferResponse> {
+export async function requestInference(
+  file: File,
+  options: InferOptions,
+  debug?: boolean,
+): Promise<InferResponse> {
   const form = new FormData();
   form.append('image', file, file.name);
   if (typeof options.steps === 'number') {
@@ -62,7 +66,8 @@ export async function requestInference(file: File, options: InferOptions): Promi
   if (typeof options.latentWindowSize === 'number') {
     form.append('latent_window_size', options.latentWindowSize.toString());
   }
-  const res = await fetch('/api/infer', {
+  const query = debug ? '?debug=1' : '';
+  const res = await fetch(`/api/infer${query}`, {
     method: 'POST',
     body: form,
   });

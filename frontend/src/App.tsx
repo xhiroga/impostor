@@ -2,13 +2,20 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import './App.css';
 import { fetchStatus, fetchVideos, requestInference, type InferOptions, type VideoEntry } from './api';
 import { ThreeViewer } from './components/ThreeViewer';
+import { getLocale, getMessages } from './i18n';
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 function App() {
+  const t = getMessages(getLocale());
   const [videos, setVideos] = useState<VideoEntry[]>([]);
   const [extraVideos, setExtraVideos] = useState<VideoEntry[]>([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [viewerAngles, setViewerAngles] = useState('');
-  const [inferMessage, setInferMessage] = useState('');
   const [inferError, setInferError] = useState('');
   const [videoError, setVideoError] = useState('');
   const [engineReady, setEngineReady] = useState(true);
@@ -22,11 +29,23 @@ function App() {
   const [inferSteps, setInferSteps] = useState(15);
   const [cfgScale, setCfgScale] = useState(1.0);
   const [loraMultiplier, setLoraMultiplier] = useState(1.5);
-  const [prompt, setPrompt] = useState('360-degree orbit around the subject, camera rising in a spiral.');
+  const [prompt, setPrompt] = useState(t.defaultPrompt);
   const [totalFrames] = useState(73);
   const [latentWindowSize] = useState(9);
+  const [isDirty, setIsDirty] = useState(true);
+  const [resultVideo, setResultVideo] = useState<VideoEntry | null>(null);
+  const debugMode = (() => {
+    const value = new URLSearchParams(window.location.search).get('debug');
+    if (!value) return false;
+    return value !== '0' && value.toLowerCase() !== 'false';
+  })();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const trackEvent = useCallback((name: string, params?: Record<string, unknown>) => {
+    if (!window.gtag) return;
+    window.gtag('event', name, params ?? {});
+  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -35,7 +54,7 @@ function App() {
       setEngineError(status.infer_error);
     } catch (error) {
       console.error('Failed to fetch status', error);
-      setEngineError('推論エンジンの状態取得に失敗しました');
+      setEngineError(t.statusFetchFailed);
     }
   }, []);
 
@@ -62,19 +81,20 @@ function App() {
           setSelectedVideo('');
           return;
         }
-        const resolved = preferred && merged.find((entry) => entry.value === preferred)
-          ? preferred
+        const current = preferred ?? selectedVideo;
+        const resolved = current && merged.find((entry) => entry.value === current)
+          ? current
           : merged[0].value;
         setSelectedVideo(resolved);
       } catch (error) {
         console.error('Failed to fetch videos', error);
-        const message = error instanceof Error ? error.message : '動画リストの取得に失敗しました';
+        const message = error instanceof Error ? error.message : t.videosFetchFailed;
         setVideoError(message);
-      } finally {
-        setLoadingVideos(false);
-      }
+    } finally {
+      setLoadingVideos(false);
+    }
     },
-    [extraVideos, mergeVideos],
+    [extraVideos, mergeVideos, selectedVideo, t.videosFetchFailed],
   );
 
   useEffect(() => {
@@ -96,11 +116,15 @@ function App() {
     }
   }, [selectedVideo]);
 
+  const markDirty = () => {
+    setIsDirty(true);
+  };
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
     setFile(nextFile);
-    setInferMessage('');
     setInferError('');
+    markDirty();
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
@@ -116,16 +140,17 @@ function App() {
       URL.revokeObjectURL(previewUrl);
     }
     setPreviewUrl(null);
-    setInferMessage('');
     setInferError('');
+    setIsDirty(true);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!file || !engineReady) return;
+    if (!file || !engineReady || !isDirty) return;
     setIsUploading(true);
     setInferError('');
     try {
+      trackEvent('generate_impostor_start');
       const options: InferOptions = {
         steps: inferSteps,
         cfg: cfgScale,
@@ -134,17 +159,17 @@ function App() {
         totalFrames,
         latentWindowSize,
       };
-      const result = await requestInference(file, options);
-      setInferMessage(result.message);
+      const result = await requestInference(file, options, debugMode);
+      setIsDirty(false);
+      setResultVideo(result.video);
+      trackEvent('generate_impostor_success', { steps: inferSteps, cfg: cfgScale, lora: loraMultiplier });
       const nextExtra = mergeVideos(extraVideos, [result.video]);
       setExtraVideos(nextExtra);
       setSelectedVideo(result.video.value);
-      await triggerDownload(result.video.value);
-      await refreshVideos(result.video.value, nextExtra);
       await refreshStatus();
     } catch (error) {
       console.error('Inference failed', error);
-      const message = error instanceof Error ? error.message : '推論に失敗しました';
+      const message = error instanceof Error ? error.message : t.inferFailed;
       setInferError(message);
     } finally {
       setIsUploading(false);
@@ -159,7 +184,7 @@ function App() {
   const triggerDownload = async (value: string) => {
     const isAbsolute = /^https?:\/\//i.test(value);
     const downloadUrl = isAbsolute ? value : `/${value}`;
-    const filename = value.split('/').pop() || 'impostor.mp4';
+    const filename = (value.split('/').pop() || 'impostor.mp4').split('?')[0] || 'impostor.mp4';
     const isSameOrigin = !isAbsolute || downloadUrl.startsWith(window.location.origin);
 
     if (isSameOrigin) {
@@ -198,15 +223,21 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-head">
-        <h1>Impostor Maker</h1>
-        <p className="lead">単一の画像から軽量な偽の3Dモデルを生成します。裏側で動画生成モデルを使用。</p>
+        <h1>{t.title}</h1>
+        <p className="lead">
+          {t.lead.split('\n').map((line, index) => (
+            <span key={line}>
+              {line}
+              {index < t.lead.split('\n').length - 1 && <br />}
+            </span>
+          ))}
+        </p>
       </header>
       <main className="layout">
         <section className="panel">
           <div className="panel-head">
-            <p className="eyebrow">Upload</p>
-            <h2>入力画像をアップロード</h2>
-            <p className="muted">768x768 にリサイズして推論します。</p>
+            <h2>{t.uploadTitle}</h2>
+            {t.uploadHint ? <p className="muted">{t.uploadHint}</p> : null}
           </div>
           <form className="infer-form" onSubmit={handleSubmit}>
             <input
@@ -220,104 +251,111 @@ function App() {
             />
             <div className="upload-preview">
               <div className="upload-preview-head">
-                <span className="muted" style={{ fontWeight: 600, color: 'var(--fg)' }}>
-                  入力画像プレビュー
-                </span>
                 <button type="button" onClick={handleClear} disabled={!file}>
-                  クリア
+                  {t.clear}
                 </button>
               </div>
               <div className="preview-stage">
                 {previewUrl ? (
-                  <img src={previewUrl} alt="選択した画像のプレビュー" />
+                  <img src={previewUrl} alt={t.previewAlt} />
                 ) : (
                   <p className="muted" style={{ textAlign: 'center' }}>
-                    まだ画像が選択されていません。
+                    {t.previewEmpty}
                   </p>
                 )}
               </div>
             </div>
             <div className="control-grid">
               <label className="control-field">
-                Steps
+                {t.steps}
                 <input
                   type="number"
                   min={1}
                   max={200}
                   step={1}
                   value={inferSteps}
-                  onChange={(event) => setInferSteps(Number(event.target.value))}
+                  onChange={(event) => {
+                    setInferSteps(Number(event.target.value));
+                    markDirty();
+                  }}
                   disabled={!engineReady || isUploading}
                 />
               </label>
               <label className="control-field">
-                CFG
+                {t.cfg}
                 <input
                   type="number"
                   min={0}
                   max={20}
                   step={0.1}
                   value={cfgScale}
-                  onChange={(event) => setCfgScale(Number(event.target.value))}
+                  onChange={(event) => {
+                    setCfgScale(Number(event.target.value));
+                    markDirty();
+                  }}
                   disabled={!engineReady || isUploading}
                 />
               </label>
               <label className="control-field">
-                LoRA multiplier
+                {t.loraMultiplier}
                 <input
                   type="number"
                   min={0}
                   max={10}
                   step={0.05}
                   value={loraMultiplier}
-                  onChange={(event) => setLoraMultiplier(Number(event.target.value))}
+                  onChange={(event) => {
+                    setLoraMultiplier(Number(event.target.value));
+                    markDirty();
+                  }}
                   disabled={!engineReady || isUploading}
                 />
               </label>
             </div>
             <details className="advanced-settings">
-              <summary>詳細設定</summary>
+              <summary>{t.advanced}</summary>
               <div className="advanced-grid">
                 <label className="control-field">
-                  Prompt
+                  {t.prompt}
                   <textarea
                     rows={3}
                     value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
+                    onChange={(event) => {
+                      setPrompt(event.target.value);
+                      markDirty();
+                    }}
                     disabled={!engineReady || isUploading}
                   />
                 </label>
-                <label className="control-field">
-                  Total Frames
-                  <input type="number" value={totalFrames} disabled />
-                  <span className="field-note">デフォルト 73（ビューア想定）</span>
-                </label>
-                <label className="control-field">
-                  Latent Window Size
-                  <input type="number" value={latentWindowSize} disabled />
-                  <span className="field-note">デフォルト 9（固定）</span>
-                </label>
+                <div className="advanced-row">
+                  <label className="control-field">
+                    {t.totalFrames}
+                    <input type="number" value={totalFrames} disabled />
+                  </label>
+                  <label className="control-field">
+                    {t.latentWindow}
+                    <input type="number" value={latentWindowSize} disabled />
+                  </label>
+                </div>
               </div>
             </details>
-            <button className="cta" type="submit" disabled={!file || !engineReady || isUploading}>
-              {isUploading ? '推論中...' : '推論開始（約3分）'}
+            <button className="cta" type="submit" disabled={!file || !engineReady || isUploading || !isDirty}>
+              {isUploading ? t.inferRunning : isDirty ? t.inferStart : t.inferDone}
             </button>
             <p className="muted note-text" style={{ textAlign: 'center' }}>
-              サーバーに送信された画像・動画は、30日後に削除されます。
+              {t.retentionNote}
             </p>
           </form>
-          {inferMessage && <p className="success-text">{inferMessage}</p>}
           {inferError && <p className="error-text">{inferError}</p>}
           {!engineReady && engineError && <p className="error-text">{engineError}</p>}
         </section>
         <section className="panel">
           <div className="panel-head">
-            <p className="eyebrow">Preview</p>
-            <h2>Impostor ビューア</h2>
-            <p className="muted">カメラをドラッグすると角度に応じてフレームを切り替え、plane に貼り付けます。</p>
+            <h2>{t.viewerTitle}</h2>
+            {t.viewerHint ? <p className="muted">{t.viewerHint}</p> : null}
           </div>
           <label className="select-field">
-            動画セレクタ
+            {t.videoSelect}
             <div className="select-row">
               <select
                 value={selectedVideo}
@@ -336,14 +374,14 @@ function App() {
                 disabled={!selectedVideo}
                 onClick={() => triggerDownload(selectedVideo)}
               >
-                ダウンロード
+                {t.download}
               </button>
             </div>
           </label>
           <div className="color-row">
             <div className="color-row-head">
               <label className="color-label" htmlFor="chroma-key-color">
-                クロマキー
+                {t.chromaKey}
               </label>
             </div>
             <div className="color-inputs">
@@ -361,7 +399,7 @@ function App() {
               <input
                 className={`color-code${bgEnabled ? '' : ' is-muted'}`}
                 type="text"
-                value={bgEnabled ? bgColor.toUpperCase() : '未選択'}
+                value={bgEnabled ? bgColor.toUpperCase() : t.unselected}
                 readOnly
               />
               {bgEnabled && (
@@ -369,14 +407,14 @@ function App() {
                   className="ghost-button"
                   type="button"
                   onClick={() => setBgEnabled(false)}
-                  aria-label="背景色選択をクリア"
+                  aria-label={t.clearBgAria}
                 >
-                  クリア
+                  {t.clear}
                 </button>
               )}
             </div>
           </div>
-          {loadingVideos && <p className="muted" style={{ fontSize: '0.85rem' }}>動画リストを更新中...</p>}
+          {loadingVideos && <p className="muted" style={{ fontSize: '0.85rem' }}>{t.loadingVideos}</p>}
           {videoError && <p className="error-text">{videoError}</p>}
           <div className="viewer-shell">
             <ThreeViewer
@@ -392,7 +430,7 @@ function App() {
       </main>
       <footer className="app-footer">
         <div className="footer-content">
-          <span>Made by</span>
+          <span>{t.madeBy}</span>
           <a
             href="https://sawara.dev"
             target="_blank"
@@ -418,7 +456,7 @@ function App() {
               <source src="/images/logo.mp4" type="video/mp4" />
             </video>
           </a>
-          <span>on</span>
+          <span>{t.on}</span>
           <a
             href="https://github.com/xhiroga/impostor"
             target="_blank"
@@ -427,8 +465,66 @@ function App() {
           >
             <img src="/images/github-mark.svg" alt="GitHub" className="footer-github" />
           </a>
+          <span className="footer-sep">/</span>
+          <a
+            href="https://github.com/sponsors/xhiroga"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="footer-link is-sponsor"
+            onClick={() => trackEvent('funding_link_click', { location: 'footer' })}
+          >
+            {t.sponsorLink}
+            <svg
+              className="footer-heart"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="currentColor"
+                d="m8 14.25.345.666a.75.75 0 0 1-.69 0l-.008-.004-.018-.01a7.152 7.152 0 0 1-.31-.17 22.055 22.055 0 0 1-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.066 22.066 0 0 1-3.744 2.584l-.018.01-.006.003h-.002ZM4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.58 20.58 0 0 0 8 13.393a20.58 20.58 0 0 0 3.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.749.749 0 0 1-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5Z"
+              />
+            </svg>
+          </a>
         </div>
+        <p className="footer-note">{t.analyticsNote}</p>
       </footer>
+      {resultVideo && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <h3>{t.modalTitle}</h3>
+            <p className="muted">{t.modalHint}</p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="cta"
+                onClick={() => {
+                  trackEvent('download_click', { location: 'result_modal' });
+                  triggerDownload(resultVideo.value);
+                }}
+              >
+                {t.modalDownload}
+              </button>
+              <a
+                className="secondary-button sponsor-button"
+                href="https://github.com/sponsors/xhiroga"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackEvent('funding_link_click', { location: 'result_modal' })}
+              >
+                {t.modalSupport}
+              </a>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setResultVideo(null)}
+            >
+              {t.modalClose}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
