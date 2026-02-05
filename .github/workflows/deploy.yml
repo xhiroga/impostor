@@ -49,7 +49,7 @@ jobs:
             --min-instances=1 \
             --max-instances=1 \
             --timeout=600 \
-            --set-env-vars IMPOSTOR_EXECUTION_MODE=modal,CLOUDFLARE_R2_BUCKET=impostor-bucket \
+            --set-env-vars IMPOSTOR_EXECUTION_MODE=modal,CLOUDFLARE_R2_BUCKET=impostor-output \
             --update-secrets MODAL_PROXY_KEY=impostor-modal-proxy-key:latest,MODAL_PROXY_SECRET=impostor-modal-proxy-secret:latest,MODAL_WORKSPACE=impostor-modal-workspace:latest,CLOUDFLARE_R2_ACCESS_KEY_ID=impostor-r2-access-key-id:latest,CLOUDFLARE_R2_SECRET_ACCESS_KEY=impostor-r2-secret-access-key:latest,CLOUDFLARE_R2_S3_API=impostor-r2-s3-api:latest
             # memory=2Gi: エラーを避ける。Memory limit of 1024 MiB exceeded with 1037 MiB used.
             # cpu=1: memoryが2Giの場合はcpu=1が最低ライン。
