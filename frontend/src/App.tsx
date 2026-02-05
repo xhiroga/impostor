@@ -16,7 +16,6 @@ function App() {
   const [extraVideos, setExtraVideos] = useState<VideoEntry[]>([]);
   const [selectedVideo, setSelectedVideo] = useState('');
   const [viewerAngles, setViewerAngles] = useState('');
-  const [inferMessage, setInferMessage] = useState('');
   const [inferError, setInferError] = useState('');
   const [videoError, setVideoError] = useState('');
   const [engineReady, setEngineReady] = useState(true);
@@ -123,7 +122,6 @@ function App() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
     setFile(nextFile);
-    setInferMessage('');
     setInferError('');
     markDirty();
     if (previewUrl) {
@@ -141,7 +139,6 @@ function App() {
       URL.revokeObjectURL(previewUrl);
     }
     setPreviewUrl(null);
-    setInferMessage('');
     setInferError('');
     setIsDirty(true);
   };
@@ -162,7 +159,6 @@ function App() {
         latentWindowSize,
       };
       const result = await requestInference(file, options, debugMode);
-      setInferMessage(result.message);
       setIsDirty(false);
       setResultVideo(result.video);
       trackEvent('generate_impostor_success', { steps: inferSteps, cfg: cfgScale, lora: loraMultiplier });
